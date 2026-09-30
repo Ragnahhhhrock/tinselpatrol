@@ -15,7 +15,17 @@ html{box-sizing:border-box;height:100%}
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--body);
   overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-#stage{position:relative;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+body{display:flex;align-items:center;justify-content:center}
+#stage{position:relative;flex:none;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+/* desktop / landscape: keep a phone-shaped play area that fits the window height, centred on a backdrop */
+@media (min-aspect-ratio:7/10){
+  body{background:radial-gradient(ellipse at 50% 40%,#4a2529 0%,#2a1519 55%,#170a0d 100%)}
+  #stage{height:min(100vh,1000px);height:min(100dvh,1000px);width:min(100vw,calc(min(100vh,1000px)*.6));width:min(100vw,calc(min(100dvh,1000px)*.6));
+    border-radius:20px;box-shadow:0 0 0 6px rgba(246,196,83,.18),0 30px 80px rgba(0,0,0,.6)}
+  @media (max-height:700px){#stage{border-radius:0;box-shadow:none}}
+  .panel{max-width:380px}
+}
+@media (pointer:fine){#cv{cursor:crosshair}.desk{display:block!important}}
 #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 #hud{position:absolute;left:0;right:0;top:0;padding:12px 16px 0;display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none}
 .stat{display:flex;flex-direction:column;line-height:1}
@@ -44,6 +54,34 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .go:active{transform:translateY(3px);box-shadow:0 2px 0 #a02d27}
 .big{font:400 64px/1 var(--display);color:var(--ink);font-variant-numeric:tabular-nums}
 .best{font-size:14px;color:var(--muted);font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.overlay{overflow:hidden}
+.panel{max-height:100%;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain}
+.go.alt{background:var(--pine);box-shadow:0 5px 0 #1f5f3a}
+.go.alt:active{box-shadow:0 2px 0 #1f5f3a}
+.go.small{font-size:20px;padding:12px}
+.ghost{background:rgba(255,255,255,.1);color:var(--ink);border:0;border-radius:14px;padding:12px;font:800 13px var(--body);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.ghost:active{background:rgba(255,255,255,.18)}
+.row2{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+.row2 .go{margin-top:0;font-size:20px;padding:14px 8px}
+.challenge{font-size:14px!important;font-weight:800!important;color:var(--gold)!important;background:rgba(246,196,83,.12);border-radius:12px;padding:8px 12px}
+.keys{display:none;font-size:12px!important;color:var(--muted)!important;letter-spacing:.04em}
+.board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;text-align:left}
+.board li{display:grid;grid-template-columns:26px 1fr auto 40px;gap:8px;align-items:baseline;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.06);font:800 15px var(--body);color:var(--ink)}
+.board li.empty{display:block;text-align:center;color:var(--muted);font-weight:600}
+.board .rk{color:var(--muted);font-size:13px}
+.board .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .sc{font:400 18px var(--display);font-variant-numeric:tabular-nums}
+.board .wv{color:var(--muted);font-size:12px;text-align:right}
+.board li.me{background:var(--gold);color:#3a2a05}
+.board li.me .rk,.board li.me .wv{color:#6b4d0a}
+.entry{display:flex;flex-direction:column;gap:6px;text-align:left}
+.entry .row{display:flex;gap:8px}
+.entry input,.linkbox{flex:1;min-width:0;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.18);border-radius:12px;padding:10px 12px;color:var(--ink);font:800 16px var(--body);
+  -webkit-user-select:text;user-select:text;touch-action:auto}
+.entry input:focus{outline:none;border-color:var(--gold)}
+.entry .save{background:var(--gold);color:#3a2a05;border:0;border-radius:12px;padding:0 16px;font:400 18px var(--display);cursor:pointer}
+.linkbox{font-size:12px;width:100%}
+#hs{background:rgba(30,12,16,.86)}
 button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
 @media (prefers-reduced-motion:reduce){#treat.ready{animation:none}}
 </style>
@@ -68,7 +106,10 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     <div class="panel">
       <span class="eyebrow">Tinsel Patrol</span>
       <h1 class="shout">DEFEND<br>THE TREE!</h1>
+      <p id="challenge" class="challenge" hidden></p>
       <button id="play" class="go" type="button">Start</button>
+      <button id="showScores" class="ghost" type="button">High scores</button>
+      <p class="keys desk">Click cats to shoo them &middot; Space = Treat &middot; M = sound</p>
     </div>
   </div>
 
@@ -78,7 +119,28 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
       <p>Every tree is down.</p>
       <div class="big" id="finalScore">0</div>
       <div class="best" id="bestLine">Best 0</div>
-      <button id="again" class="go" type="button">Play again</button>
+      <p id="vs" class="challenge" hidden></p>
+      <form id="entry" class="entry" hidden autocomplete="off">
+        <label class="lbl" for="nm">New high score! Your name</label>
+        <div class="row"><input id="nm" maxlength="12" placeholder="Name" enterkeyhint="done" autocapitalize="words" spellcheck="false"><button class="save" type="submit">Save</button></div>
+      </form>
+      <ol id="board" class="board"></ol>
+      <div class="row2">
+        <button id="share" class="go alt" type="button">Share</button>
+        <button id="again" class="go" type="button">Play again</button>
+      </div>
+      <input id="shareLink" class="linkbox" readonly hidden aria-label="Link to share">
+      <button id="overScores" class="ghost" type="button">All high scores</button>
+    </div>
+  </div>
+
+  <div id="hs" class="overlay" hidden>
+    <div class="panel">
+      <h2>High scores</h2>
+      <ol id="hsList" class="board"></ol>
+      <button id="hsShare" class="go alt small" type="button">Share my best</button>
+      <input id="hsLink" class="linkbox" readonly hidden aria-label="Link to share">
+      <button id="hsClose" class="ghost" type="button">Back</button>
     </div>
   </div>
 </div>
@@ -100,6 +162,97 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
   let muted = false;
   try { muted = localStorage.getItem('tinsel-muted') === '1'; } catch (e) {}
   muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
+
+  // ---------- high scores + sharing ----------
+  const hsEl = $('hs'), nmEl = $('nm'), entryEl = $('entry');
+  const SKEY = 'tinsel-scores';
+  const clean = s => String(s || '').replace(/[<>&"'`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+  let scores = [], lastName = '', pending = null, run = { s: 0, w: 0, n: '' };
+  try {
+    const a = JSON.parse(localStorage.getItem(SKEY) || '[]');
+    if (Array.isArray(a)) scores = a.filter(e => e && isFinite(e.s)).map(e => ({ n: clean(e.n), s: Math.floor(e.s), w: Math.floor(+e.w || 0), d: +e.d || 0 }));
+  } catch (e) {}
+  try { lastName = clean(localStorage.getItem('tinsel-name')); } catch (e) {}
+  if (!scores.length && best > 0) scores = [{ n: 'You', s: best, w: 0, d: 0 }];
+  const sortScores = () => { scores.sort((a, b) => b.s - a.s || a.d - b.d); scores.length = Math.min(scores.length, 10); };
+  sortScores();
+  best = Math.max(best, scores.length ? scores[0].s : 0);
+  const qualifies = s => s > 0 && (scores.length < 10 || s > scores[scores.length - 1].s);
+  function saveScore(name) {
+    if (!pending) return;
+    const e = { n: clean(name) || 'Player', s: pending.s, w: pending.w, d: Date.now() };
+    pending = null; lastName = e.n; run.n = e.n;
+    scores.push(e); sortScores();
+    try { localStorage.setItem(SKEY, JSON.stringify(scores)); localStorage.setItem('tinsel-name', e.n); } catch (er) {}
+    entryEl.hidden = true;
+    renderBoard($('board'), 5, scores.indexOf(e));
+  }
+  function renderBoard(ol, n, hi) {
+    ol.textContent = '';
+    if (!scores.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'No scores yet. Be the first!'; ol.appendChild(li); return; }
+    let idx = scores.map((_, i) => i).slice(0, n);
+    if (hi >= n) idx = idx.slice(0, n - 1).concat(hi);
+    idx.forEach(i => {
+      const e = scores[i], li = document.createElement('li');
+      if (i === hi) li.className = 'me';
+      [['rk', i + 1], ['nm', e.n || 'Player'], ['sc', e.s], ['wv', e.w ? 'W' + e.w : '']].forEach(([c, t]) => { const s = document.createElement('span'); s.className = c; s.textContent = t; li.appendChild(s); });
+      ol.appendChild(li);
+    });
+  }
+  // a shared link looks like /?s=250&n=Sam
+  let challenge = null;
+  try {
+    const p = new URLSearchParams(location.search), s = parseInt(p.get('s'), 10);
+    if (s > 0 && s < 1e6) {
+      challenge = { s, n: clean(p.get('n')) };
+      const c = $('challenge'); c.hidden = false; c.textContent = (challenge.n || 'A friend') + ' scored ' + s + '. Can you beat it?';
+      history.replaceState(null, '', location.href.split(/[?#]/)[0]);
+    }
+  } catch (e) {}
+  function shareUrl(n, s) { return location.href.split(/[?#]/)[0] + '?s=' + s + (n ? '&n=' + encodeURIComponent(n) : ''); }
+  function flashBtn(b, msg) {
+    if (!b.dataset.l) b.dataset.l = b.textContent;
+    b.textContent = msg; clearTimeout(b._t); b._t = setTimeout(() => { b.textContent = b.dataset.l; }, 1800);
+  }
+  async function doShare(s, w, n, btn, box) {
+    const url = shareUrl(n, s);
+    const text = 'I scored ' + s + ' on Tinsel Patrol' + (w ? ' (wave ' + w + ')' : '') + '! Can you beat me?';
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Tinsel Patrol', text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    const full = text + ' ' + url;
+    try { await navigator.clipboard.writeText(full); flashBtn(btn, 'Copied!'); }
+    catch (e) { box.value = full; box.hidden = false; box.focus(); box.select(); }
+  }
+  function showOver() {
+    const vs = $('vs');
+    if (challenge) {
+      const who = challenge.n || 'your friend';
+      vs.hidden = false;
+      vs.textContent = score > challenge.s ? 'You beat ' + who + ' (' + challenge.s + ')!' : 'To beat ' + who + ': ' + challenge.s;
+    } else vs.hidden = true;
+    entryEl.hidden = !pending; $('shareLink').hidden = true; $('share').hidden = run.s <= 0;
+    if (pending) nmEl.value = lastName;
+    renderBoard($('board'), 5, -1);
+    overEl.hidden = false;
+    if (pending && window.matchMedia && matchMedia('(pointer:fine)').matches) nmEl.focus();
+  }
+  const openScores = () => { renderBoard($('hsList'), 10, -1); $('hsShare').hidden = !scores.length; $('hsLink').hidden = true; hsEl.hidden = false; };
+  $('showScores').addEventListener('click', openScores);
+  $('overScores').addEventListener('click', openScores);
+  $('hsClose').addEventListener('click', () => { hsEl.hidden = true; });
+  entryEl.addEventListener('submit', e => { e.preventDefault(); saveScore(nmEl.value); });
+  $('share').addEventListener('click', () => doShare(run.s, run.w, pending ? clean(nmEl.value) : run.n, $('share'), $('shareLink')));
+  $('hsShare').addEventListener('click', () => { const t = scores[0]; if (t) doShare(t.s, t.w, t.n === 'You' || t.n === 'Player' ? '' : t.n, $('hsShare'), $('hsLink')); });
+  addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !hsEl.hidden) { hsEl.hidden = true; return; }
+    if ((e.target.closest && e.target.closest('input,textarea')) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (state === 'play') {
+      if (k === ' ' || k === 't' || k === 'T') { e.preventDefault(); useTreat(); }
+      else if (k === 'm' || k === 'M') muteBtn.click();
+    } else if (k === 'Enter' && hsEl.hidden && !(e.target.closest && e.target.closest('button')) && (state === 'menu' || (state === 'over' && !overEl.hidden))) begin();
+  });
 
   const CHARGE_MAX = 10, ORN_MAX = 8;
   const trees = [], cats = [], parts = [], texts = [], snow = [], ripples = [];
@@ -319,17 +472,21 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     updateHud();
   }
   function begin() {
+    if (pending) saveScore(nmEl.value);
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     initAudio(); reset(); state = 'play'; musicStart();
-    startEl.hidden = true; overEl.hidden = true; hud.hidden = false;
+    startEl.hidden = true; overEl.hidden = true; hsEl.hidden = true; hud.hidden = false;
   }
   function endGame() {
     state = 'over'; musicStop();
     if (score > best) { best = score; try { localStorage.setItem('tinsel-best', String(best)); } catch (e) {} }
+    run = { s: score, w: wave, n: lastName };
+    pending = qualifies(score) ? { s: score, w: wave } : null;
     setTimeout(() => {
       if (state !== 'over') return;
       $('finalScore').textContent = score;
       $('bestLine').textContent = 'Best ' + best;
-      overEl.hidden = false;
+      showOver();
     }, 1100);
   }
   function updateHud() {
@@ -726,6 +883,6 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__tp = { cats, trees, texts, get state() { return state; }, begin };
+  window.__tp = { cats, trees, texts, get state() { return state; }, begin, end(s) { score = s; trees.forEach(t => { t.alive = false; }); endGame(); } };
 })();
 </script>
