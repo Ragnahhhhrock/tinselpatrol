@@ -78,6 +78,8 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 #treat.ready .in{background:var(--gold);color:#3a2a05}
 @keyframes pulse{to{transform:scale(1.1)}}
 .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:rgba(30,12,16,.5)}
+/* start screen sits high and light so the swipe demo on the floor shows below it */
+#start{align-items:flex-start;padding-top:max(48px,8vh);background:linear-gradient(rgba(30,12,16,.45),rgba(30,12,16,.1) 70%)}
 .panel{width:100%;max-width:340px;background:var(--panel);border-radius:22px;padding:26px 22px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.45);text-align:center}
 .panel h1,.panel h2{margin:0;font:400 44px/1 var(--display);color:var(--gold);text-wrap:balance}
 .eyebrow{font:800 12px var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
@@ -150,7 +152,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
   muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
 
   const CHARGE_MAX = 10, ORN_MAX = 8;
-  const trees = [], cats = [], parts = [], texts = [], snow = [], ripples = [];
+  const trees = [], cats = [], parts = [], texts = [], snow = [], ripples = [], trail = [];
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const ORN = [[-26,-28,'#e2453c'],[24,-38,'#f6c453'],[-14,-64,'#4aa3ff'],[14,-74,'#ff7eb6'],[-8,-100,'#e2453c'],[6,-116,'#f6c453'],[34,-20,'#ff7eb6'],[-2,-50,'#4aa3ff']];
@@ -361,7 +363,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
 
   // ---------- game flow ----------
   function reset() {
-    cats.length = parts.length = texts.length = ripples.length = 0;
+    cats.length = parts.length = texts.length = ripples.length = trail.length = 0;
     trees.forEach(t => { t.hp = ORN_MAX; t.alive = true; t.shake = 0; t.fallT = 0; t.on = t.unlock <= 1; t.grow = t.on ? 1 : 0; });
     time = 0; spawnT = 1.2; wave = 1; score = 0; charge = 0; shake = 0; flash = 0; bannerT = 1.6;
     updateHud();
@@ -398,7 +400,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     if (wave >= 3 && r < .28) type = 'fat'; else if (wave >= 2 && r < .55) type = 'zoom';
     const fromLeft = Math.random() < .65 ? !lastLeft : lastLeft; lastLeft = fromLeft;
     const c = { x: fromLeft ? -34 : WW + 34, y: 0, type, state: 'walk', col: pick(CATS), phase: rnd(0, 6.28),
-      dir: fromLeft ? 1 : -1, hitT: 0, rot: 0, vx: 0, vy: 0, t: 0, tearT: 0 };
+      dir: fromLeft ? 1 : -1, hitT: 0, hitCd: 0, rot: 0, vx: 0, vy: 0, t: 0, tearT: 0 };
     aim(c, pick(at)); c.y = c.lane;
     if (type === 'fat')  Object.assign(c, { hp: 2, sz: 1.3, speed: 40 + wave * 3,  interval: 1.5 });
     else if (type === 'zoom') Object.assign(c, { hp: 1, sz: .92, speed: 125 + wave * 5, interval: 1.3 });
@@ -424,7 +426,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     }
   }
   function bite(c) {
-    const t = c.tree; if (!t.alive) return;
+    const t = c.tree; if (!t.alive || state !== 'play') return;
     t.hp--; t.shake = .3;
     const o = ORN[Math.max(0, t.hp)];
     parts.push({ x: t.x + o[0] * t.sc, y: t.y + o[1] * t.sc, vx: rnd(-40, 40), vy: -60, col: o[2], life: 1.2, kind: 'orn' });
@@ -448,24 +450,95 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     updateHud();
   }
 
-  // ---------- input ----------
-  cv.addEventListener('pointerdown', e => {
-    if (state !== 'play') return;
-    e.preventDefault();
-    const r = cv.getBoundingClientRect();
-    const x = (e.clientX - r.left) / S, y = (e.clientY - r.top) / S;
+  // ---------- input: tap or swipe across cats ----------
+  let pDown = false, lastP = null;
+  function toWorld(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / S, y: (e.clientY - r.top) / S }; }
+  function hitAt(x, y, isTap) {
     let hit = null, bd = 1e9;
     for (const c of cats) {
-      if (c.state === 'shoo' || c.state === 'idle') continue;
+      if (c.state === 'shoo' || c.state === 'idle' || c.hitCd > 0) continue;
       const d = Math.hypot(c.x - x, (c.y - 4) - y) - c.sz * 10;
       if (d < bd) { bd = d; hit = c; }
     }
-    if (hit && bd < 40) {
-      hit.hp--;
+    if (hit && bd < (isTap ? 40 : 30)) {
+      hit.hp--; hit.hitCd = .3;
       if (hit.hp <= 0) shoo(hit);
       else { hit.hitT = .25; hiss(); texts.push({ x: hit.x, y: hit.y - 30, t: 0, s: 'Hiss!', c: '#ff9a8f', size: 16 }); }
-    } else ripples.push({ x, y, t: 0 });
+      return true;
+    }
+    return false;
+  }
+  cv.addEventListener('pointerdown', e => {
+    if (state !== 'play') return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    const p = toWorld(e); pDown = true; lastP = p;
+    trail.push({ x: p.x, y: p.y, life: .22 });
+    if (!hitAt(p.x, p.y, true)) ripples.push({ x: p.x, y: p.y, t: 0 });
   });
+  cv.addEventListener('pointermove', e => {
+    if (!pDown || state !== 'play') return;
+    const p = toWorld(e), dx = p.x - lastP.x, dy = p.y - lastP.y, n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 8));
+    for (let i = 1; i <= n; i++) hitAt(lastP.x + dx * i / n, lastP.y + dy * i / n, false);
+    trail.push({ x: p.x, y: p.y, life: .22 }); lastP = p;
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => cv.addEventListener(ev, () => { pDown = false; lastP = null; }));
+
+  // ---------- start-screen demo: a hand swipes cats away ----------
+  const demo = { x: 180, y: 520, phase: 'idle', t: 0, spawnT: .5, sx: 0, sy: 0, ex: 0, ey: 0, ax: 0, ay: 0 };
+  const ease = p => p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+  function updateDemo(dt) {
+    demo.spawnT -= dt;
+    if (demo.spawnT <= 0) {
+      if (cats.filter(c => c.state !== 'shoo').length < 2) spawnCat();
+      demo.spawnT = rnd(1.1, 1.7);
+    }
+    if (demo.phase === 'idle') {
+      demo.t += dt;
+      const rx = WW / 2 + Math.sin(time * 1.3) * 30, ry = H - 190 + Math.sin(time * 2.1) * 8;
+      demo.x += (rx - demo.x) * Math.min(1, 3 * dt); demo.y += (ry - demo.y) * Math.min(1, 3 * dt);
+      const c = cats.find(c => (c.state === 'walk' && c.x > 60 && c.x < WW - 60) || c.state === 'jump' || c.state === 'tear');
+      if (c && demo.t > .3) {
+        const lead = c.state === 'walk' ? c.dir * c.speed * .6 : 0, cx = c.x + lead, cy = c.y - 4, d = c.state === 'walk' ? c.dir : (c.x < WW / 2 ? 1 : -1);
+        Object.assign(demo, { phase: 'approach', t: 0, ax: demo.x, ay: demo.y, sx: cx - d * 52, sy: cy - 36, ex: cx + d * 56, ey: cy + 24 });
+      }
+    } else if (demo.phase === 'approach') {
+      demo.t = Math.min(1, demo.t + dt / .42); const p = ease(demo.t);
+      demo.x = demo.ax + (demo.sx - demo.ax) * p; demo.y = demo.ay + (demo.sy - demo.ay) * p;
+      if (demo.t >= 1) { demo.phase = 'swipe'; demo.t = 0; }
+    } else if (demo.phase === 'swipe') {
+      demo.t = Math.min(1, demo.t + dt / .2); const p = ease(demo.t);
+      demo.x = demo.sx + (demo.ex - demo.sx) * p; demo.y = demo.sy + (demo.ey - demo.sy) * p;
+      trail.push({ x: demo.x, y: demo.y, life: .25 });
+      for (const c of cats) if (c.state !== 'shoo' && Math.hypot(c.x - demo.x, c.y - 4 - demo.y) < 30 + c.sz * 8) {
+        shoo(c, true); texts.push({ x: c.x, y: c.y - 26, t: 0, s: pick(['BOOP!', 'SHOO!', 'SWIPE!']), c: '#fff6e5', size: 18 });
+      }
+      if (demo.t >= 1) { demo.phase = 'rest'; demo.t = 0; }
+    } else if (demo.phase === 'rest') {
+      demo.t += dt; if (demo.t > .35) { demo.phase = 'idle'; demo.t = 0; }
+    }
+  }
+  function rr(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke(); }
+  function drawHand(x, y, pressed) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-.35); ctx.scale(pressed ? 1.35 : 1.5, pressed ? 1.35 : 1.5);
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#3a1f24'; ctx.fillStyle = '#fff6e5'; ctx.lineJoin = 'round';
+    rr(-5, -1, 10, 27, 5);            // pointing finger, tip at 0,0
+    rr(4, 13, 9, 14, 4.5); rr(11, 16, 8, 13, 4);  // folded fingers
+    rr(-9, 20, 28, 25, 9);            // palm
+    ctx.save(); ctx.translate(-9, 29); ctx.rotate(-.7); rr(-4, -10, 8, 17, 4); ctx.restore(); // thumb
+    ctx.restore();
+    if (pressed) { ctx.strokeStyle = 'rgba(255,246,229,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 12, 0, 6.2832); ctx.stroke(); }
+  }
+  function drawTrail() {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let i = 1; i < trail.length; i++) {
+      const a = trail[i - 1], b = trail[i]; if (Math.hypot(a.x - b.x, a.y - b.y) > 90) continue;
+      const k = Math.max(0, b.life / .25);
+      ctx.strokeStyle = 'rgba(255,246,229,' + (.75 * k) + ')'; ctx.lineWidth = 3 + 9 * k;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+  }
+
   $('play').addEventListener('click', begin);
   $('again').addEventListener('click', begin);
   treatBtn.addEventListener('click', useTreat);
@@ -499,11 +572,12 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
       }
       spawnT -= dt;
       if (spawnT <= 0) { spawnCat(); spawnT = Math.max(.7, 2.2 - .12 * (wave - 1)) * rnd(.8, 1.2); }
-    }
+    } else if (state === 'menu') updateDemo(dt);
 
     for (let i = cats.length - 1; i >= 0; i--) {
       const c = cats[i];
       if (c.hitT > 0) c.hitT -= dt;
+      if (c.hitCd > 0) c.hitCd -= dt;
       if (c.state === 'walk') {
         if (!c.tree.alive) { retarget(c); continue; }
         c.dir = c.tx > c.x ? 1 : -1;
@@ -528,6 +602,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     }
     for (let i = texts.length - 1; i >= 0; i--) { const t = texts[i]; t.t += dt; t.y -= 28 * dt; if (t.t > .9) texts.splice(i, 1); }
     for (let i = ripples.length - 1; i >= 0; i--) { ripples[i].t += dt; if (ripples[i].t > .35) ripples.splice(i, 1); }
+    for (let i = trail.length - 1; i >= 0; i--) { trail[i].life -= dt; if (trail[i].life <= 0) trail.splice(i, 1); }
   }
 
   // ---------- drawing ----------
@@ -744,6 +819,8 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     });
     ctx.globalAlpha = 1;
     ripples.forEach(r => { ctx.strokeStyle = 'rgba(255,255,255,' + (.7 - r.t * 1.8) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, 6 + r.t * 60, 0, 6.2832); ctx.stroke(); });
+    drawTrail();
+    if (state === 'menu') drawHand(demo.x, demo.y, demo.phase === 'swipe');
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     texts.forEach(t => {
       ctx.globalAlpha = Math.max(0, 1 - t.t / .9);
@@ -774,7 +851,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__tp = { cats, trees, texts, get state() { return state; }, begin };
+  window.__tp = { cats, trees, texts, get state() { return state; }, demoPhase: () => demo.phase, begin };
 })();
 </script>
 </body>
