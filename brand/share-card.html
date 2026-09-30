@@ -1,0 +1,32 @@
+<!doctype html>
+<!-- Tinsel Patrol share card. Renders og-image.png (1200x630) and twitter-card.png (1200x600).
+     Every colour, font, radius and shadow here is a Tinsel Patrol design-system token. -->
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@800&display=block" rel="stylesheet">
+<style>
+:root{
+  --night:#2a1519; --panel:#3a1f24; --ink:#fff6e5; --ink-muted:#d9bfa8;
+  --tinsel-red:#e2453c; --tinsel-red-deep:#a02d27; --gold:#f6c453;
+  --font-display:'Lilita One','Trebuchet MS',sans-serif; --font-body:'Nunito',system-ui,sans-serif;
+  --radius-md:16px; --radius-lg:22px; --space-5:22px; --space-6:24px;
+}
+html,body{margin:0;background:var(--night)}
+.card{position:relative;width:1200px;height:var(--h,630px);overflow:hidden;background:var(--night);display:flex}
+.words{flex:1;display:flex;flex-direction:column;justify-content:center;gap:var(--space-5);padding:0 0 0 72px}
+.eyebrow{font:800 24px var(--font-body);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-muted)}
+.shout{margin:0;font:400 120px/.92 var(--font-display);color:var(--ink);text-shadow:0 9px 0 var(--tinsel-red)}
+.order{font:400 38px/1 var(--font-display);color:var(--gold);letter-spacing:.03em;margin-top:6px}
+.cta{align-self:flex-start;margin-top:10px;background:var(--tinsel-red);color:#fff;font:400 32px var(--font-display);
+  padding:14px 28px;border-radius:var(--radius-md);box-shadow:0 7px 0 var(--tinsel-red-deep)}
+.scene{position:relative;width:500px;margin:var(--space-6) 0;border-radius:var(--radius-lg) 0 0 var(--radius-lg);overflow:hidden;background:var(--panel)}
+.scene img{position:absolute;width:700px;left:-140px;top:var(--top,-716px)}
+</style></head>
+<body><div class="card">
+  <div class="words">
+    <div class="eyebrow">Tinsel Patrol</div>
+    <h1 class="shout">DEFEND<br>THE TREE!</h1>
+    <div class="order">KEEP CATS OFF THE TREE(S)</div>
+    <div class="cta">tinselpatrol.com</div>
+  </div>
+  <div class="scene"><img src="scene-swipe.png" alt=""></div>
+</div></body></html>

@@ -9,7 +9,7 @@ DESC = ('Cats are sneaking into the living room. Tap them away before they tear 
         'Christmas tree! A free festive game for your phone – no download needed.')
 SOCIAL_TITLE = 'Tinsel Patrol: Defend the Tree!'
 SOCIAL_DESC = 'Tap the cats before they tear down your Christmas tree. Free to play on your phone, no download.'
-IMG_ALT = 'Tinsel Patrol game: cats climbing a Christmas tree in a cosy living room, with the words Defend the Tree!'
+IMG_ALT = 'Tinsel Patrol: a hand swipes a ginger cat off a Christmas tree in a cosy living room, beside the words Defend the Tree! Keep cats off the tree(s).'
 
 src = open(os.path.join(D, 'src', 'tinsel-patrol.html'), encoding='utf-8').read()
 style_end = src.index('</style>') + len('</style>')
@@ -47,8 +47,10 @@ head = f'''<!doctype html>
 <meta name="color-scheme" content="dark">
 
 <!-- icons + install -->
+<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="application-name" content="Tinsel Patrol">
@@ -76,7 +78,9 @@ head = f'''<!doctype html>
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{SOCIAL_TITLE}">
 <meta name="twitter:description" content="{SOCIAL_DESC}">
-<meta name="twitter:image" content="{URL}og-image.png">
+<meta name="twitter:image" content="{URL}twitter-card.png">
+<meta name="twitter:image:width" content="1200">
+<meta name="twitter:image:height" content="600">
 <meta name="twitter:image:alt" content="{IMG_ALT}">
 
 <script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>
@@ -97,8 +101,9 @@ manifest = {
     'theme_color': '#2a1519',
     'categories': ['games', 'entertainment'],
     'icons': [
-        {'src': '/icon-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any maskable'},
-        {'src': '/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any maskable'},
+        {'src': '/icon-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any'},
+        {'src': '/icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any'},
+        {'src': '/icon-maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'},
         {'src': '/favicon.svg', 'sizes': 'any', 'type': 'image/svg+xml'},
     ],
 }
@@ -113,7 +118,7 @@ open(os.path.join(SITE, 'sitemap.xml'), 'w').write(
 # Cloudflare Pages headers: correct manifest type, cache icons/images for a day
 open(os.path.join(SITE, '_headers'), 'w').write(
     '/manifest.webmanifest\n  Content-Type: application/manifest+json\n\n'
-    '/*.png\n  Cache-Control: public, max-age=86400\n\n'
+    '/*.png\n  Cache-Control: public, max-age=86400\n\n/favicon.ico\n  Cache-Control: public, max-age=86400\n\n'
     '/favicon.svg\n  Cache-Control: public, max-age=86400\n')
 
 
