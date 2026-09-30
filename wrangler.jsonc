@@ -7,7 +7,9 @@
     "directory": "./public"
   },
   "workers_dev": true,
+  "preview_urls": false,
   "routes": [
-    { "pattern": "tinselpatrol.com", "custom_domain": true }
+    { "pattern": "tinselpatrol.com", "custom_domain": true },
+    { "pattern": "www.tinselpatrol.com", "custom_domain": true }
   ]
 }
