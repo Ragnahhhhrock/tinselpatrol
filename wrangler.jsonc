@@ -1,0 +1,13 @@
+// Cloudflare Worker config: publishes ./public as a static site.
+// Cloudflare runs `npx wrangler deploy` on every push to main.
+{
+  "name": "tinsel-patrol",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public"
+  },
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "tinselpatrol.com", "custom_domain": true }
+  ]
+}

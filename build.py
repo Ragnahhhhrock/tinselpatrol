@@ -1,8 +1,8 @@
-"""Build the tinselpatrol.com site files (repo root) from src/tinsel-patrol.html. Run: python3 build.py"""
+"""Build the tinselpatrol.com site files (public/) from src/tinsel-patrol.html. Run: python3 build.py"""
 import json, os
 
 D = os.path.dirname(os.path.abspath(__file__))
-SITE = D
+SITE = os.path.join(D, 'public')
 URL = 'https://tinselpatrol.com/'
 TITLE = 'Tinsel Patrol – Defend the Christmas Tree from Cats'
 DESC = ('Cats are sneaking into the living room. Tap them away before they tear down your '
