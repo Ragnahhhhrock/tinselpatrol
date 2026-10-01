@@ -54,7 +54,31 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .go:active{transform:translateY(3px);box-shadow:0 2px 0 #a02d27}
 .big{font:400 64px/1 var(--display);color:var(--ink);font-variant-numeric:tabular-nums}
 .best{font-size:14px;color:var(--muted);font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.chip{display:inline-block;background:rgba(255,255,255,.1);color:var(--muted);border:0;border-radius:999px;padding:8px 14px;font:800 12px var(--body);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-decoration:none;line-height:1.2}
+.chip.gold{background:var(--gold);color:#3a2a05}
+.chip:active{transform:translateY(1px)}
+.rank{font:400 20px/1.1 var(--display);color:var(--gold);letter-spacing:.02em;min-height:1.1em}
+.row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.name-form{display:flex;gap:8px}
+.name-form input{flex:1;min-width:0;background:#4a2328;color:var(--ink);border:2px solid transparent;border-radius:12px;padding:12px 14px;font:800 17px var(--body);user-select:text;-webkit-user-select:text;touch-action:manipulation}
+.name-form input::placeholder{color:var(--muted);opacity:.8}
+.name-form input:focus{outline:none;border-color:var(--gold)}
+.name-form button{background:var(--gold);color:#3a2a05;border:0;border-radius:12px;padding:0 18px;font:400 20px var(--display);letter-spacing:.02em;box-shadow:0 4px 0 #b88a22;cursor:pointer}
+.name-form button:active{transform:translateY(2px);box-shadow:0 2px 0 #b88a22}
+.name-form button:disabled{opacity:.6}
+.stack{display:flex;flex-direction:column;gap:10px}
+.share-lbl{font:800 11px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;text-align:left}
+.board li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 12px;font:800 16px var(--body);color:var(--ink)}
+.board li.me{background:var(--gold);color:#3a2a05}
+.board .n{font:400 18px var(--display);color:var(--muted)}
+.board li.me .n{color:#3a2a05}
+.board .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .sc{font:400 20px var(--display);font-variant-numeric:tabular-nums}
+.board-msg{font:600 15px var(--body);color:var(--muted);padding:14px 0}
+.panel .go.alt{background:rgba(255,255,255,.12);box-shadow:0 5px 0 rgba(0,0,0,.25);font-size:20px;padding:12px}
+#over .panel,#scores .panel{max-height:calc(100% - 8px);overflow-y:auto;gap:12px}
+button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
 @media (prefers-reduced-motion:reduce){#treat.ready{animation:none}}
 </style>
 
@@ -81,6 +105,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
       <h1 class="shout">DEFEND<br>THE TREE!</h1>
       <p class="order">KEEP CATS OFF THE TREE(S)</p>
       <button id="play" class="go" type="button">Start</button>
+      <div class="row"><button id="startScores" class="chip" type="button">High scores</button></div>
     </div>
   </div>
 
@@ -90,7 +115,26 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
       <p>Every tree is down.</p>
       <div class="big" id="finalScore">0</div>
       <div class="best" id="bestLine">Best 0</div>
+      <div class="rank" id="rankLine" aria-live="polite"></div>
+      <form id="nameForm" class="name-form" autocomplete="off">
+        <input id="nameIn" type="text" maxlength="12" placeholder="Your name" aria-label="Your name for the high score table" enterkeyhint="done" autocapitalize="words" spellcheck="false">
+        <button type="submit" id="nameBtn">Save</button>
+      </form>
+      <div class="stack" id="shareBox">
+        <span class="share-lbl">Dare your friends</span>
+        <div class="row" id="shareRow"></div>
+      </div>
       <button id="again" class="go" type="button">Play again</button>
+      <div class="row"><button id="overScores" class="chip" type="button">High scores</button></div>
+    </div>
+  </div>
+
+  <div id="scores" class="overlay" hidden>
+    <div class="panel">
+      <span class="eyebrow">Tinsel Patrol</span>
+      <h2>High scores</h2>
+      <ol class="board" id="board"></ol>
+      <button id="scoresClose" class="go alt" type="button">Back</button>
     </div>
   </div>
 </div>
@@ -357,7 +401,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
   }
   function begin() {
     initAudio(); reset(); state = 'play'; musicStart();
-    startEl.hidden = true; overEl.hidden = true; hud.hidden = false;
+    startEl.hidden = true; overEl.hidden = true; scoresEl.hidden = true; hud.hidden = false;
   }
   function endGame() {
     state = 'over'; musicStop();
@@ -366,6 +410,7 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
       if (state !== 'over') return;
       $('finalScore').textContent = score;
       $('bestLine').textContent = 'Best ' + best;
+      prepareOver();
       overEl.hidden = false;
     }, 1100);
   }
@@ -525,6 +570,91 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
   }
+
+  // ---------- high scores + sharing ----------
+  const API = '/api/scores', SITE = 'https://tinselpatrol.com';
+  const scoresEl = $('scores'), board = $('board'), nameForm = $('nameForm'), nameIn = $('nameIn'), nameBtn = $('nameBtn');
+  let myId = null, scoresFrom = null, saving = false;
+  try { nameIn.value = localStorage.getItem('tinsel-name') || ''; } catch (e) {}
+
+  const shareText = () => 'I scored ' + score + ' on Tinsel Patrol. Reckon you can beat it? tinselpatrol.com';
+  function prepareOver() {
+    myId = null; saving = false;
+    $('rankLine').textContent = '';
+    nameForm.hidden = score < 1; nameBtn.disabled = false;
+    $('shareBox').hidden = score < 1;
+    buildShare();
+  }
+  function chip(label, href, cls) {
+    const a = document.createElement(href ? 'a' : 'button');
+    a.className = 'chip' + (cls ? ' ' + cls : ''); a.textContent = label;
+    if (href) { a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; } else a.type = 'button';
+    return a;
+  }
+  function buildShare() {
+    const row = $('shareRow'), t = shareText(), tq = encodeURIComponent(t), uq = encodeURIComponent(SITE);
+    row.textContent = '';
+    if (navigator.share) {
+      const b = chip('Share', null, 'gold');
+      b.addEventListener('click', () => { navigator.share({ text: t, url: SITE }).catch(() => {}); });
+      row.appendChild(b);
+    }
+    row.appendChild(chip('X', 'https://twitter.com/intent/tweet?text=' + encodeURIComponent('I scored ' + score + ' on Tinsel Patrol. Reckon you can beat it?') + '&url=' + uq));
+    row.appendChild(chip('Facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + uq + '&quote=' + tq));
+    row.appendChild(chip('WhatsApp', 'https://wa.me/?text=' + tq));
+    const cp = chip('Copy', null);
+    cp.addEventListener('click', () => {
+      const done = () => { cp.textContent = 'Copied'; setTimeout(() => { cp.textContent = 'Copy'; }, 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => {});
+      else { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
+    });
+    row.appendChild(cp);
+  }
+  function renderBoard(rows, msg) {
+    board.textContent = '';
+    if (!rows || !rows.length) { const li = document.createElement('li'); li.className = 'board-msg'; li.style.display = 'block'; li.style.background = 'none'; li.textContent = msg || 'No scores yet. Be the first!'; board.appendChild(li); return; }
+    rows.forEach((r, i) => {
+      const li = document.createElement('li'); if (r.id === myId) li.className = 'me';
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+      const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = r.score;
+      li.append(n, nm, sc); board.appendChild(li);
+    });
+  }
+  async function loadBoard() {
+    renderBoard(null, 'Loading…');
+    try {
+      const r = await fetch(API, { cache: 'no-store' }); if (!r.ok) throw 0;
+      renderBoard((await r.json()).top);
+    } catch (e) { renderBoard(null, 'The scoreboard is offline. Try again soon.'); }
+  }
+  function openScores(from) {
+    scoresFrom = from; startEl.hidden = true; overEl.hidden = true; scoresEl.hidden = false; loadBoard();
+  }
+  function closeScores() {
+    scoresEl.hidden = true;
+    if (scoresFrom === 'over' && state === 'over') overEl.hidden = false; else startEl.hidden = false;
+  }
+  nameForm.addEventListener('submit', async e => {
+    e.preventDefault(); if (saving || score < 1) return;
+    saving = true; nameBtn.disabled = true;
+    const name = nameIn.value.trim();
+    try { localStorage.setItem('tinsel-name', name); } catch (e2) {}
+    try {
+      const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, score }) });
+      if (!r.ok) throw r.status;
+      const d = await r.json(); myId = d.id;
+      nameForm.hidden = true;
+      $('rankLine').textContent = d.rank === 1 ? "You're #1!" : 'You ranked #' + d.rank;
+      openScores('over'); renderBoard(d.top);
+    } catch (err) {
+      saving = false; nameBtn.disabled = false;
+      $('rankLine').textContent = err === 429 ? 'Easy, tiger. Try again in a moment.' : 'Could not save. Try again.';
+    }
+  });
+  $('startScores').addEventListener('click', () => openScores('start'));
+  $('overScores').addEventListener('click', () => openScores('over'));
+  $('scoresClose').addEventListener('click', closeScores);
 
   $('play').addEventListener('click', begin);
   $('again').addEventListener('click', begin);
@@ -838,6 +968,6 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__tp = { cats, trees, texts, get state() { return state; }, demoPhase: () => demo.phase, audio: () => ({ state: ac && ac.state, hint: !soundHint.hidden, ios: IOS, stream: !!streamEl, streamPaused: streamEl ? streamEl.paused : null }), begin };
+  window.__tp = { cats, trees, texts, get state() { return state; }, demoPhase: () => demo.phase, audio: () => ({ state: ac && ac.state, hint: !soundHint.hidden, ios: IOS, stream: !!streamEl, streamPaused: streamEl ? streamEl.paused : null }), begin, forceEnd: n => { score = n; endGame(); } };
 })();
 </script>
