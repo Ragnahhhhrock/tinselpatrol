@@ -1,0 +1,14 @@
+{
+  "appId": "com.tinselpatrol.app",
+  "appName": "Tinsel Patrol",
+  "webDir": "www",
+  "backgroundColor": "#2a1519",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#2a1519"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true },
+    "StatusBar": { "style": "DARK", "backgroundColor": "#2a1519" }
+  }
+}

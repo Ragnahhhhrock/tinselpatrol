@@ -154,6 +154,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   let best = 0;
   try { best = +localStorage.getItem('tinsel-best') || 0; } catch (e) {}
   let muted = false;
+  // Native haptics: only exists inside the iOS app (Capacitor); a no-op on the website.
+  const buzz = (style) => { try { const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics; if (H) H.impact({ style: style || 'LIGHT' }); } catch (e) {} };
   try { muted = localStorage.getItem('tinsel-muted') === '1'; } catch (e) {}
   muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
 
@@ -474,6 +476,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       texts.push({ x: c.x, y: c.y - 26, t: 0, s: pick(['BOOP!', 'SHOO!', 'MRRP!', 'BEGONE!']), c: '#fff6e5', size: 18 });
       texts.push({ x: c.x, y: c.y - 6, t: 0, s: '+' + pts, c: '#f6c453', size: 15 });
       tone(420, 880, .13, 'triangle', .1);
+      buzz(c.type === 'fat' ? 'MEDIUM' : 'LIGHT');
       meow(c.type === 'fat' ? 260 : c.type === 'zoom' ? 600 : rnd(380, 480), .4);
       updateHud();
     }
@@ -487,6 +490,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     if (t.hp <= 0) {
       t.alive = false; t.fallT = 0; t.dir = Math.random() < .5 ? -1 : 1; shake = .5;
       tone(320, 50, .7, 'sawtooth', .1);
+      buzz('HEAVY');
       texts.push({ x: t.x, y: t.y - 110 * t.sc, t: 0, s: 'TIMBER!', c: '#e2453c', size: 22 });
       if (!aliveTrees().length) endGame();
     }
@@ -593,7 +597,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   }
 
   // ---------- high scores + sharing ----------
-  const API = '/api/scores', SITE = 'https://tinselpatrol.com';
+  const SITE = 'https://tinselpatrol.com';
+  const API = /^https?:$/.test(location.protocol) ? '/api/scores' : SITE + '/api/scores';
   const scoresEl = $('scores'), board = $('board'), nameForm = $('nameForm'), nameIn = $('nameIn'), nameBtn = $('nameBtn');
   let myId = null, scoresFrom = null, saving = false;
   try { nameIn.value = localStorage.getItem('tinsel-name') || ''; } catch (e) {}

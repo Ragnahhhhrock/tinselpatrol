@@ -1,0 +1,53 @@
+# Codemagic cloud-Mac build: Capacitor iOS app -> signed .ipa -> TestFlight.
+# One-time setup is in docs/ios-app-store.md.
+workflows:
+  ios-testflight:
+    name: iOS to TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    integrations:
+      app_store_connect: Tinsel Patrol ASC   # name of the App Store Connect API key you add in Codemagic
+    environment:
+      node: 22
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.tinselpatrol.app
+      vars:
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+        BUNDLE_ID: com.tinselpatrol.app
+        APP_STORE_APPLE_ID: "REPLACE_ME"       # numeric Apple ID from App Store Connect > App Information
+    triggering:
+      events:
+        - tag                                  # build by pushing a tag like ios-1.0.0 (not every push)
+      tag_patterns:
+        - pattern: "ios-*"
+          include: true
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Build web and sync into iOS project
+        script: |
+          python3 build.py
+          npx cap sync ios
+      - name: Set build number from TestFlight
+        script: |
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          LATEST=${LATEST:-0}
+          cd ios/App
+          agvtool new-version -all $((LATEST + 1))
+      - name: Apply signing profiles
+        script: xcode-project use-profiles
+      - name: Build signed ipa
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
