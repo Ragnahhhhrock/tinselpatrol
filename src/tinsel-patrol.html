@@ -425,6 +425,23 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   function aim(c, t) {
     c.tree = t; c.tx = t.x + rnd(-18, 18) * t.sc; c.ty = t.y - rnd(38, 108) * t.sc; c.lane = rnd(H - 98, H - 34);
   }
+  // ---------- difficulty tuning (late-game scaling; tweak after playtesting) ----------
+  const TUNE = {
+    speedKnee: 40,        // waves beyond this add speed at SPEED_SLOPE_AFTER (soft cap, stops a wave-70 cliff)
+    speedSlopeAfter: .5,
+    spawnBase: 2.2, spawnStep: .12, spawnFloorEarly: .7,   // waves 1-14 (original curve)
+    spawnLateStep: .01, spawnFloorLate: .45,               // wave 15+ keeps tightening to 0.45s (~wave 39)
+    switchWave: 15, switchChance: .35,   // cats that change tree mid-walk
+    armorWave: 30,                       // 2hp normal cats start appearing
+    tierEvery: 10, tierHp: 1,            // fat cat gains +1 hp every N waves from armorWave
+    biteSpeedupStart: 20, biteSpeedupPerWave: .01, biteIntervalMin: .65  // tear faster after wave 20
+  };
+  const effWave = w => w <= TUNE.speedKnee ? w : TUNE.speedKnee + (w - TUNE.speedKnee) * TUNE.speedSlopeAfter;
+  function spawnDelay() {
+    const early = Math.max(TUNE.spawnFloorEarly, TUNE.spawnBase - TUNE.spawnStep * (wave - 1));
+    if (wave <= 14) return early;
+    return Math.max(TUNE.spawnFloorLate, TUNE.spawnFloorEarly - TUNE.spawnLateStep * (wave - 14));
+  }
   function spawnCat() {
     const at = aliveTrees(); if (!at.length) return;
     const r = Math.random();
@@ -434,9 +451,13 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     const c = { x: fromLeft ? -34 : WW + 34, y: 0, type, state: 'walk', col: pick(CATS), phase: rnd(0, 6.28),
       dir: fromLeft ? 1 : -1, hitT: 0, hitCd: 0, rot: 0, vx: 0, vy: 0, t: 0, tearT: 0 };
     aim(c, pick(at)); c.y = c.lane;
-    if (type === 'fat')  Object.assign(c, { hp: 2, sz: 1.3, speed: 40 + wave * 3,  interval: 1.5 });
-    else if (type === 'zoom') Object.assign(c, { hp: 1, sz: .92, speed: 125 + wave * 5, interval: 1.3 });
-    else Object.assign(c, { hp: 1, sz: 1.05, speed: 58 + wave * 4, interval: 1.7 });
+    const ew = effWave(wave);
+    const tier = wave >= TUNE.armorWave ? Math.floor((wave - TUNE.armorWave) / TUNE.tierEvery) + 1 : 0;
+    if (type === 'fat')  Object.assign(c, { hp: 2 + tier * TUNE.tierHp, sz: 1.3, speed: 40 + ew * 3,  interval: 1.5 });
+    else if (type === 'zoom') Object.assign(c, { hp: 1, sz: .92, speed: 125 + ew * 5, interval: 1.3 });
+    else Object.assign(c, { hp: (tier && Math.random() < .3) ? 2 : 1, sz: 1.05, speed: 58 + ew * 4, interval: 1.7 });
+    c.interval *= Math.max(TUNE.biteIntervalMin, 1 - TUNE.biteSpeedupPerWave * Math.max(0, wave - TUNE.biteSpeedupStart));
+    c.sw = wave >= TUNE.switchWave && Math.random() < TUNE.switchChance;   // will change target once mid-walk
     cats.push(c);
   }
   function retarget(c) {
@@ -688,7 +709,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
         updateHud();
       }
       spawnT -= dt;
-      if (spawnT <= 0) { spawnCat(); spawnT = Math.max(.7, 2.2 - .12 * (wave - 1)) * rnd(.8, 1.2); }
+      if (spawnT <= 0) { spawnCat(); spawnT = spawnDelay() * rnd(.8, 1.2); }
     } else if (state === 'menu') updateDemo(dt);
 
     for (let i = cats.length - 1; i >= 0; i--) {
@@ -699,6 +720,10 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
         if (!c.tree.alive) { retarget(c); continue; }
         c.dir = c.tx > c.x ? 1 : -1;
         c.y += (c.lane - c.y) * Math.min(1, 6 * dt);
+        if (c.sw && Math.abs(c.tx - c.x) < 150) {
+          c.sw = false; const others = aliveTrees().filter(t => t !== c.tree);
+          if (others.length) aim(c, pick(others));
+        }
         if (Math.abs(c.tx - c.x) < 60) { c.state = 'jump'; c.t = 0; c.x0 = c.x; c.y0 = c.y; }
         else c.x += c.dir * c.speed * dt;
       } else if (c.state === 'jump') {
