@@ -41,6 +41,21 @@ function cleanName(raw) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Share landing page: /s/<score> gives Facebook a score in the preview, then sends people to the game.
+    const m = url.pathname.match(/^\/s\/(\d{1,6})$/);
+    if (m) {
+      const n = Math.min(Number(m[1]), MAX_SCORE);
+      const title = `I scored ${n} on Tinsel Patrol`;
+      const desc = 'Reckon you can beat it? Tap the cats before they tear down the Christmas tree. Free to play, no download.';
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>
+<meta property="og:type" content="website"><meta property="og:site_name" content="Tinsel Patrol">
+<meta property="og:url" content="https://tinselpatrol.com/s/${n}"><meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}"><meta property="og:image" content="https://tinselpatrol.com/og-image.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta http-equiv="refresh" content="0;url=/"></head><body><a href="/">Play Tinsel Patrol</a></body></html>`;
+      return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' } });
+    }
     if (url.pathname !== '/api/scores') return env.ASSETS.fetch(request);
     if (!env.DB) return json({ error: 'scoreboard unavailable' }, 503);
 

@@ -671,7 +671,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       row.appendChild(b);
     }
     row.appendChild(chip('X', 'https://twitter.com/intent/tweet?text=' + encodeURIComponent('I scored ' + score + ' on Tinsel Patrol. Reckon you can beat it?') + '&url=' + uq));
-    row.appendChild(chip('Facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + uq + '&quote=' + tq));
+    // Facebook ignores text params; it reads the score from the link's preview (served by /s/<score> in the worker).
+    row.appendChild(chip('Facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(SITE + '/s/' + score)));
+    row.appendChild(chip('Threads', 'https://www.threads.com/intent/post?text=' + encodeURIComponent(t)));
+    const ig = chip('Insta Story', null);
+    ig.addEventListener('click', () => shareStory(ig));
+    row.appendChild(ig);
     row.appendChild(chip('WhatsApp', 'https://wa.me/?text=' + tq));
     const cp = chip('Copy', null);
     cp.addEventListener('click', () => {
@@ -680,6 +685,37 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       else { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
     });
     row.appendChild(cp);
+  }
+  // Instagram has no web share link for Stories: build a 1080x1920 score image, then hand it to the
+  // phone's share sheet (pick Instagram > Stories). Desktop falls back to a download.
+  function storyBlob() {
+    const W = 1080, H = 1920, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'), cs = getComputedStyle(document.documentElement);
+    const v = (n, d) => (cs.getPropertyValue(n).trim() || d);
+    const disp = v('--display', "'Lilita One', sans-serif"), body = v('--body', "'Nunito', sans-serif");
+    g.fillStyle = v('--bg', '#2a1519'); g.fillRect(0, 0, W, H);
+    g.textAlign = 'center';
+    g.fillStyle = v('--muted', '#d9bfa8'); g.font = '800 44px ' + body; g.fillText('I DEFENDED THE TREE', W / 2, 560);
+    g.fillStyle = v('--gold', '#f6c453'); g.font = '400 300px ' + disp; g.fillText(String(score), W / 2, 880);
+    g.fillStyle = v('--ink', '#fff6e5'); g.font = '400 110px ' + disp; g.fillText('Tinsel Patrol', W / 2, 1080);
+    g.fillStyle = v('--muted', '#d9bfa8'); g.font = '800 48px ' + body; g.fillText('Reckon you can beat it?', W / 2, 1180);
+    g.fillStyle = v('--red', '#e2453c'); g.font = '400 64px ' + disp; g.fillText('tinselpatrol.com', W / 2, 1500);
+    return new Promise(res => c.toBlob(res, 'image/png'));
+  }
+  async function shareStory(btn) {
+    const label = btn.textContent; btn.textContent = 'Making…';
+    try {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      const blob = await storyBlob(), file = new File([blob], 'tinsel-patrol-score.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], text: shareText() }); } catch (e) {}
+      } else {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        btn.textContent = 'Saved! Add to Story'; setTimeout(() => { btn.textContent = label; }, 2600); return;
+      }
+    } catch (e) {}
+    btn.textContent = label;
   }
   function renderBoard(rows, msg) {
     board.textContent = '';
