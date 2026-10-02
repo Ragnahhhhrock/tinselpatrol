@@ -210,7 +210,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
 
   const CHARGE_MAX = 10, ORN_MAX = 8;
-  const trees = [], cats = [], parts = [], texts = [], snow = [], ripples = [], trail = [];
+  const trees = [], cats = [], parts = [], texts = [], snow = [], ripples = [], trail = [], flyers = [];
+  const BCOL = ['#e2453c', '#f6c453', '#4aa3ff', '#ff7eb6', '#7be0a0'];
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const ORN = [[-26,-28,'#e2453c'],[24,-38,'#f6c453'],[-14,-64,'#4aa3ff'],[14,-74,'#ff7eb6'],[-8,-100,'#e2453c'],[6,-116,'#f6c453'],[34,-20,'#ff7eb6'],[-2,-50,'#4aa3ff']];
@@ -446,7 +447,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 
   // ---------- game flow ----------
   function reset() {
-    cats.length = parts.length = texts.length = ripples.length = trail.length = 0;
+    cats.length = parts.length = texts.length = ripples.length = trail.length = flyers.length = 0;
     trees.forEach(t => { t.hp = ORN_MAX; t.alive = true; t.shake = 0; t.fallT = 0; t.on = t.unlock <= 1; t.grow = t.on ? 1 : 0; });
     time = 0; spawnT = 1.2; wave = 1; score = 0; charge = 0; shake = 0; flash = 0; bannerT = 1.6;
     updateHud();
@@ -498,14 +499,18 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     const at = aliveTrees(); if (!at.length) return;
     const r = Math.random();
     let type = 'norm';
-    if (wave >= 3 && r < .28) type = 'fat'; else if (wave >= 2 && r < .55) type = 'zoom';
+    // the bauble cat turns up from wave 2, more often when a tree is running low; only one at a time
+    const needy = at.some(t => t.hp <= 3), hasB = cats.some(c => c.type === 'bauble' && c.state !== 'shoo');
+    if (state === 'play' && !hasB && wave >= 2 && Math.random() < (needy ? .4 : .1)) type = 'bauble';
+    else if (wave >= 3 && r < .28) type = 'fat'; else if (wave >= 2 && r < .55) type = 'zoom';
     const fromLeft = Math.random() < .65 ? !lastLeft : lastLeft; lastLeft = fromLeft;
     const c = { x: fromLeft ? -34 : WW + 34, y: 0, type, state: 'walk', col: pick(CATS), phase: rnd(0, 6.28),
       dir: fromLeft ? 1 : -1, hitT: 0, hitCd: 0, rot: 0, vx: 0, vy: 0, t: 0, tearT: 0 };
     aim(c, pick(at)); c.y = c.lane;
     const ew = effWave(wave);
     const tier = wave >= TUNE.armorWave ? Math.floor((wave - TUNE.armorWave) / TUNE.tierEvery) + 1 : 0;
-    if (type === 'fat')  Object.assign(c, { hp: 2 + tier * TUNE.tierHp, sz: 1.3, speed: 40 + ew * 3,  interval: 1.5 });
+    if (type === 'bauble') Object.assign(c, { hp: 4, hpMax: 4, sz: 1.2, speed: 46 + ew * 3, interval: 1.6, bc: pick(BCOL) });
+    else if (type === 'fat')  Object.assign(c, { hp: 2 + tier * TUNE.tierHp, sz: 1.3, speed: 40 + ew * 3,  interval: 1.5 });
     else if (type === 'zoom') Object.assign(c, { hp: 1, sz: .92, speed: 125 + ew * 5, interval: 1.3 });
     else Object.assign(c, { hp: (tier && Math.random() < .3) ? 2 : 1, sz: 1.05, speed: 58 + ew * 4, interval: 1.7 });
     c.interval *= Math.max(TUNE.biteIntervalMin, 1 - TUNE.biteSpeedupPerWave * Math.max(0, wave - TUNE.biteSpeedupStart));
@@ -520,16 +525,32 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   function shoo(c, quiet) {
     c.state = 'shoo'; c.t = 0;
     c.vx = (c.x < WW / 2 ? -1 : 1) * rnd(160, 280); c.vy = -rnd(260, 420);
+    if (c.type === 'bauble') releaseBauble(c);
     if (!quiet) {
-      const pts = c.type === 'fat' ? 25 : c.type === 'zoom' ? 20 : 10;
+      const pts = c.type === 'bauble' ? 40 : c.type === 'fat' ? 25 : c.type === 'zoom' ? 20 : 10;
       score += pts; charge = Math.min(CHARGE_MAX, charge + 1);
       texts.push({ x: c.x, y: c.y - 26, t: 0, s: pick(['BOOP!', 'SHOO!', 'MRRP!', 'BEGONE!']), c: '#fff6e5', size: 18 });
       texts.push({ x: c.x, y: c.y - 6, t: 0, s: '+' + pts, c: '#f6c453', size: 15 });
       tone(420, 880, .13, 'triangle', .1);
       buzz(c.type === 'fat' ? 'MEDIUM' : 'LIGHT');
-      meow(c.type === 'fat' ? 260 : c.type === 'zoom' ? 600 : rnd(380, 480), .4);
+      meow(c.type === 'fat' || c.type === 'bauble' ? 260 : c.type === 'zoom' ? 600 : rnd(380, 480), .4);
       updateHud();
     }
+  }
+  // the collar bauble pings off the shooed cat and flies to the tree in most danger
+  function releaseBauble(c) {
+    if (c.gave) return; c.gave = true;
+    const need = aliveTrees().filter(t => t.hp <= 2).sort((a, b) => a.hp - b.hp)[0];
+    const x = c.x + c.dir * 8 * c.sz, y = c.y - 4 * c.sz;
+    if (need) {
+      flyers.push({ x, y, x0: x, y0: y, t: 0, tree: need, col: c.bc });
+      texts.push({ x: c.x, y: c.y - 46, t: 0, s: 'BAUBLE!', c: '#f6c453', size: 20 });
+    } else {
+      // nothing needs saving: the bauble pops off as a bonus
+      for (let i = 0; i < 8; i++) parts.push({ x, y, vx: rnd(-90, 90), vy: rnd(-140, -30), col: c.bc, life: .7, kind: 'spark' });
+      if (state === 'play') { score += 30; texts.push({ x: c.x, y: c.y - 46, t: 0, s: '+30', c: '#f6c453', size: 18 }); updateHud(); }
+    }
+    tone(1300, 1900, .18, 'sine', .08); tone(1700, 2300, .22, 'sine', .06, .08);
   }
   function bite(c) {
     const t = c.tree; if (!t.alive || state !== 'play') return;
@@ -570,7 +591,11 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     if (hit && bd < (isTap ? 40 : 30)) {
       hit.hp--; hit.hitCd = .3;
       if (hit.hp <= 0) shoo(hit);
-      else { hit.hitT = .25; hiss(); texts.push({ x: hit.x, y: hit.y - 30, t: 0, s: 'Hiss!', c: '#ff9a8f', size: 16 }); }
+      else {
+        hit.hitT = .25; hiss();
+        if (hit.type === 'bauble') { tone(1500, 1100, .12, 'sine', .07); meow(240, .3, .1); }
+        texts.push({ x: hit.x, y: hit.y - 30, t: 0, s: hit.type === 'bauble' ? pick(['Mrowr!', 'Hiss!', 'Tinkle!']) : 'Hiss!', c: '#ff9a8f', size: 16 });
+      }
       return true;
     }
     return false;
@@ -829,6 +854,21 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
         if (c.t > 1.5 || c.y > H + 80) cats.splice(i, 1);
       }
     }
+    for (let i = flyers.length - 1; i >= 0; i--) {
+      const f = flyers[i]; f.t += dt / .7; const p = Math.min(1, f.t), e = p * p * (3 - 2 * p);
+      const tx = f.tree.x, ty = f.tree.y - 70 * f.tree.sc;
+      f.x = f.x0 + (tx - f.x0) * e; f.y = f.y0 + (ty - f.y0) * e - Math.sin(p * Math.PI) * 60;
+      if (p >= 1) {
+        flyers.splice(i, 1);
+        const t = f.tree;
+        if (t.alive && t.on) {
+          t.hp = Math.min(ORN_MAX, t.hp + 2); t.grow = 1;
+          for (let k = 0; k < 10; k++) parts.push({ x: tx, y: ty, vx: rnd(-80, 80), vy: rnd(-110, -10), col: '#f6c453', life: .7, kind: 'spark' });
+          texts.push({ x: t.x, y: t.y - 150 * t.sc, t: 0, s: 'SAVED!', c: '#7be0a0', size: 22 });
+          tone(659, 659, .1, 'triangle', .1); tone(880, 880, .1, 'triangle', .1, .09); tone(1175, 1175, .22, 'triangle', .1, .18);
+        }
+      }
+    }
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 420 * dt;
       if (p.life <= 0) parts.splice(i, 1);
@@ -972,6 +1012,16 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     }
   }
 
+  function baubleAt(x, y, r, col) {
+    ctx.strokeStyle = '#f6c453'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, y - r - 3); ctx.lineTo(x, y - r + .5); ctx.stroke();
+    ell(x, y, r, r, col);
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(x - r * .35, y - r * .35, r * .3, 0, 6.2832); ctx.fill();
+  }
+  function hpPips(c, x, y) {
+    if (c.type !== 'bauble') return;
+    for (let i = 0; i < c.hpMax; i++) { ctx.fillStyle = i < c.hp ? '#e2453c' : 'rgba(255,255,255,.28)'; ctx.beginPath(); ctx.arc(x + (i - (c.hpMax - 1) / 2) * 7, y, 2.6, 0, 6.2832); ctx.fill(); }
+  }
+
   // side view, used while a cat walks in across the floor
   function drawCatSide(c) {
     const col = c.col;
@@ -999,7 +1049,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     ell(hx + 2.5, -6.5, 2.9, 3.3, '#ffe066'); ell(hx + 3, -6.5, 1, 2.7, '#111');
     ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(hx + 9, -1); ctx.lineTo(hx + 19, -4); ctx.moveTo(hx + 9, 0.5); ctx.lineTo(hx + 19, 2); ctx.stroke();
-    if (c.hp > 1) { ctx.fillStyle = '#e2453c'; ctx.beginPath(); ctx.arc(hx - 2, -22, 3, 0, 6.2832); ctx.fill(); }
+    if (c.type === 'bauble' && !c.gave) {
+      ctx.strokeStyle = '#c93a34'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 8, 1); ctx.lineTo(hx - 1, 5); ctx.stroke();
+      baubleAt(hx - 4, 10 + Math.sin(ph) * .8, 4.6, c.bc);
+    }
+    if (c.type === 'bauble') hpPips(c, hx - 2, -26);
+    else if (c.hp > 1) { ctx.fillStyle = '#e2453c'; ctx.beginPath(); ctx.arc(hx - 2, -22, 3, 0, 6.2832); ctx.fill(); }
     ctx.restore();
   }
 
@@ -1035,7 +1090,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     tri(-2, 1, 2, 1, 0, 3.5, '#f27c98');
     ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(-9, 2); ctx.lineTo(-18, 0); ctx.moveTo(-9, 4); ctx.lineTo(-18, 5); ctx.moveTo(9, 2); ctx.lineTo(18, 0); ctx.moveTo(9, 4); ctx.lineTo(18, 5); ctx.stroke();
-    if (c.hp > 1) { ctx.fillStyle = '#e2453c'; ctx.beginPath(); ctx.arc(0, -22, 3, 0, 6.2832); ctx.fill(); }
+    if (c.type === 'bauble' && !c.gave) {
+      ctx.strokeStyle = '#c93a34'; ctx.lineWidth = 3.2; ctx.beginPath(); ctx.moveTo(-10, 6); ctx.quadraticCurveTo(0, 11, 10, 6); ctx.stroke();
+      baubleAt(0, 14 + Math.sin(time * 9 + c.phase) * 1.2, 5, c.bc);
+    }
+    if (c.type === 'bauble') hpPips(c, 0, -27);
+    else if (c.hp > 1) { ctx.fillStyle = '#e2453c'; ctx.beginPath(); ctx.arc(0, -22, 3, 0, 6.2832); ctx.fill(); }
     ctx.restore();
   }
 
@@ -1051,6 +1111,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       ell(p.x, p.y, p.kind === 'orn' ? 6 : 2.5, p.kind === 'orn' ? 6 : 2.5, p.col);
     });
     ctx.globalAlpha = 1;
+    flyers.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.scale(1.5, 1.5); ctx.globalAlpha = .35; ell(0, 0, 9, 9, '#f6c453'); ctx.globalAlpha = 1; baubleAt(0, 0, 5.5, f.col); ctx.restore(); });
     ripples.forEach(r => { ctx.strokeStyle = 'rgba(255,255,255,' + (.7 - r.t * 1.8) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, 6 + r.t * 60, 0, 6.2832); ctx.stroke(); });
     drawTrail();
     if (state === 'menu') drawHand(demo.x, demo.y, demo.phase === 'swipe');
@@ -1084,7 +1145,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__tp = { cats, trees, texts, get state() { return state; }, demoPhase: () => demo.phase, audio: () => ({ state: ac && ac.state, hint: !soundHint.hidden, ios: IOS, stream: !!streamEl, streamPaused: streamEl ? streamEl.paused : null }), begin, forceEnd: n => { score = n; endGame(); } };
+  window.__tp = { cats, trees, texts, flyers, spawnCat, get state() { return state; }, demoPhase: () => demo.phase, audio: () => ({ state: ac && ac.state, hint: !soundHint.hidden, ios: IOS, stream: !!streamEl, streamPaused: streamEl ? streamEl.paused : null }), begin, forceEnd: n => { score = n; endGame(); } };
 })();
 </script>
 </body>
