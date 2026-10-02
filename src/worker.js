@@ -15,13 +15,13 @@ function init(db) {
   ready ||= db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, score INTEGER NOT NULL, created INTEGER NOT NULL, ip TEXT)'),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_scores_score ON scores (score DESC, created ASC)'),
-  ]);
+  ]).then(() => db.prepare('ALTER TABLE scores ADD COLUMN wave INTEGER').run().catch(() => {})); // no-op once the column exists
   return ready;
 }
 
 async function top(db) {
   const { results } = await db
-    .prepare('SELECT id, name, score FROM scores ORDER BY score DESC, created ASC LIMIT ?')
+    .prepare('SELECT id, name, score, wave FROM scores ORDER BY score DESC, created ASC LIMIT ?')
     .bind(TOP_N)
     .all();
   return results;
@@ -76,7 +76,8 @@ export default {
         if (recent && recent.n > 0) return json({ error: 'slow down' }, 429);
 
         const name = cleanName(body?.name);
-        const ins = await env.DB.prepare('INSERT INTO scores (name, score, created, ip) VALUES (?, ?, ?, ?)').bind(name, score, now, ip).run();
+        const w = Number(body?.wave), wave = Number.isInteger(w) && w >= 1 && w <= 999 ? w : null;
+        const ins = await env.DB.prepare('INSERT INTO scores (name, score, created, ip, wave) VALUES (?, ?, ?, ?, ?)').bind(name, score, now, ip, wave).run();
         const id = ins.meta.last_row_id;
         const rank = (await env.DB.prepare('SELECT COUNT(*) + 1 AS r FROM scores WHERE score > ?').bind(score).first()).r;
         return json({ id, name, rank, top: await top(env.DB) }, 201);

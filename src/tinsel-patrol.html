@@ -69,11 +69,13 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .stack{display:flex;flex-direction:column;gap:10px}
 .share-lbl{font:800 11px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;text-align:left}
-.board li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 12px;font:800 16px var(--body);color:var(--ink)}
+.board li{display:grid;grid-template-columns:28px 1fr auto auto;gap:8px;align-items:center;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 12px;font:800 16px var(--body);color:var(--ink)}
 .board li.me{background:var(--gold);color:#3a2a05}
 .board .n{font:400 18px var(--display);color:var(--muted)}
 .board li.me .n{color:#3a2a05}
 .board .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .wv{font:800 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.board li.me .wv{color:#3a2a05}
 .board .sc{font:400 20px var(--display);font-variant-numeric:tabular-nums}
 .board-msg{font:600 15px var(--body);color:var(--muted);padding:14px 0}
 .panel .go.alt{background:rgba(255,255,255,.12);box-shadow:0 5px 0 rgba(0,0,0,.25);font-size:20px;padding:12px}
@@ -704,8 +706,9 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       const li = document.createElement('li'); if (r.id === myId) li.className = 'me';
       const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+      const wv = document.createElement('span'); wv.className = 'wv'; wv.textContent = r.wave ? 'Wave ' + r.wave : '';
       const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = r.score;
-      li.append(n, nm, sc); board.appendChild(li);
+      li.append(n, nm, wv, sc); board.appendChild(li);
     });
   }
   async function loadBoard() {
@@ -728,7 +731,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     const name = nameIn.value.trim();
     try { localStorage.setItem('tinsel-name', name); } catch (e2) {}
     try {
-      const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, score }) });
+      const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, score, wave }) });
       if (!r.ok) throw r.status;
       const d = await r.json(); myId = d.id;
       nameForm.hidden = true;
