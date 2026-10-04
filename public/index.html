@@ -206,6 +206,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   let best = 0;
   try { best = +localStorage.getItem('tinsel-best') || 0; } catch (e) {}
   let muted = false;
+  // Analytics: GA4 events via the Google tag (served first-party by Cloudflare Google tag gateway).
+  // Pushing gtag-style commands to dataLayer works whether or not gtag.js has loaded yet, and is a silent no-op elsewhere.
+  window.dataLayer = window.dataLayer || [];
+  function gtagFallback() { window.dataLayer.push(arguments); }
+  function track(name, params) { try { (window.gtag || gtagFallback)('event', name, params || {}); } catch (e) {} }
+  let shooed = 0, gamesPlayed = 0, treatsUsed = 0, treesLost = 0, runLogged = false;
   // Native haptics: only exists inside the iOS app (Capacitor); a no-op on the website.
   const buzz = (style) => { try { const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics; if (H) H.impact({ style: style || 'LIGHT' }); } catch (e) {} };
   try { muted = localStorage.getItem('tinsel-muted') === '1'; } catch (e) {}
@@ -441,6 +447,13 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     }
     musicGain = null;
   }
+  // leaving mid-run counts as an abandoned game (sent once per run)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state === 'play' && !runLogged) {
+      runLogged = true;
+      track('game_abandon', { score, level: wave, duration_s: Math.round(time), game_number: gamesPlayed });
+    }
+  });
   document.addEventListener('visibilitychange', () => {
     if (!ac) return;
     if (document.hidden) { ac.suspend(); [silentEl, streamEl].forEach(el => { if (el) el.pause(); }); }
@@ -452,15 +465,25 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     cats.length = parts.length = texts.length = ripples.length = trail.length = flyers.length = 0;
     trees.forEach(t => { t.hp = ORN_MAX; t.alive = true; t.shake = 0; t.fallT = 0; t.on = t.unlock <= 1; t.grow = t.on ? 1 : 0; });
     time = 0; spawnT = 1.2; wave = 1; score = 0; charge = 0; shake = 0; flash = 0; bannerT = 1.6;
+    shooed = 0; treatsUsed = 0; treesLost = 0; runLogged = false;
     updateHud();
   }
   function begin() {
+    const source = state === 'over' ? 'play_again' : 'start_screen';
     initAudio(); reset(); state = 'play'; musicStart();
+    gamesPlayed++;
+    track('game_start', { source, game_number: gamesPlayed, best_score: best, sound: muted ? 'off' : 'on' });
     startEl.hidden = true; overEl.hidden = true; scoresEl.hidden = true; hud.hidden = false;
   }
   function endGame() {
     state = 'over'; musicStop();
-    if (score > best) { best = score; try { localStorage.setItem('tinsel-best', String(best)); } catch (e) {} }
+    const newBest = score > best;
+    if (newBest) { best = score; try { localStorage.setItem('tinsel-best', String(best)); } catch (e) {} }
+    runLogged = true;
+    const secs = Math.round(time);
+    // duration_s / engagement_time_msec give average gameplay time once registered as a custom metric in GA4
+    track('game_over', { score, level: wave, wave, duration_s: secs, engagement_time_msec: secs * 1000, cats_shooed: shooed, treats_used: treatsUsed, trees_lost: treesLost, new_best: newBest, game_number: gamesPlayed });
+    track('post_score', { score, level: wave });
     setTimeout(() => {
       if (state !== 'over') return;
       $('finalScore').textContent = score;
@@ -530,7 +553,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     if (c.type === 'bauble') releaseBauble(c);
     if (!quiet) {
       const pts = c.type === 'bauble' ? 40 : c.type === 'fat' ? 25 : c.type === 'zoom' ? 20 : 10;
-      score += pts; charge = Math.min(CHARGE_MAX, charge + 1);
+      score += pts; shooed++; charge = Math.min(CHARGE_MAX, charge + 1);
       texts.push({ x: c.x, y: c.y - 26, t: 0, s: pick(['BOOP!', 'SHOO!', 'MRRP!', 'BEGONE!']), c: '#fff6e5', size: 18 });
       texts.push({ x: c.x, y: c.y - 6, t: 0, s: '+' + pts, c: '#f6c453', size: 15 });
       tone(420, 880, .13, 'triangle', .1);
@@ -561,7 +584,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     parts.push({ x: t.x + o[0] * t.sc, y: t.y + o[1] * t.sc, vx: rnd(-40, 40), vy: -60, col: o[2], life: 1.2, kind: 'orn' });
     tone(200, 70, .14, 'square', .07);
     if (t.hp <= 0) {
-      t.alive = false; t.fallT = 0; t.dir = Math.random() < .5 ? -1 : 1; shake = .5;
+      t.alive = false; t.fallT = 0; t.dir = Math.random() < .5 ? -1 : 1; shake = .5; treesLost++;
       tone(320, 50, .7, 'sawtooth', .1);
       buzz('HEAVY');
       texts.push({ x: t.x, y: t.y - 110 * t.sc, t: 0, s: 'TIMBER!', c: '#e2453c', size: 22 });
@@ -570,7 +593,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   }
   function useTreat() {
     if (state !== 'play' || charge < CHARGE_MAX) return;
-    charge = 0; flash = .35;
+    charge = 0; flash = .35; treatsUsed++;
+    track('treat_used', { wave, score, treat_number: treatsUsed });
     cats.forEach(c => { if (c.state !== 'shoo') shoo(c, true); });
     trees.forEach(t => { if (t.alive && t.on && t.hp < ORN_MAX) { t.hp++; const o = ORN[t.hp - 1];
       for (let i = 0; i < 6; i++) parts.push({ x: t.x + o[0] * t.sc, y: t.y + o[1] * t.sc, vx: rnd(-70, 70), vy: rnd(-90, -10), col: '#f6c453', life: .7, kind: 'spark' }); } });
@@ -691,15 +715,19 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   function chip(label, href, cls) {
     const a = document.createElement(href ? 'a' : 'button');
     a.className = 'chip' + (cls ? ' ' + cls : ''); a.textContent = label;
-    if (href) { a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; } else a.type = 'button';
+    if (href) {
+      a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.addEventListener('click', () => trackShare(label.toLowerCase().replace(/\s+/g, '_')));
+    } else a.type = 'button';
     return a;
   }
+  function trackShare(method) { track('share', { method, content_type: 'score', item_id: String(score), score, wave }); }
   function buildShare() {
     const row = $('shareRow'), t = shareText(), tq = encodeURIComponent(t), uq = encodeURIComponent(SITE);
     row.textContent = '';
     if (navigator.share) {
       const b = chip('Share', null, 'gold');
-      b.addEventListener('click', () => { navigator.share({ text: t, url: SITE }).catch(() => {}); });
+      b.addEventListener('click', () => { trackShare('native_share'); navigator.share({ text: t, url: SITE }).catch(() => {}); });
       row.appendChild(b);
     }
     row.appendChild(chip('X', 'https://twitter.com/intent/tweet?text=' + encodeURIComponent('I scored ' + score + ' on Tinsel Patrol. Reckon you can beat it?') + '&url=' + uq));
@@ -707,11 +735,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     row.appendChild(chip('Facebook', 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(SITE + '/s/' + score)));
     row.appendChild(chip('Threads', 'https://www.threads.com/intent/post?text=' + encodeURIComponent(t)));
     const ig = chip('Insta Story', null);
-    ig.addEventListener('click', () => shareStory(ig));
+    ig.addEventListener('click', () => { trackShare('instagram_story'); shareStory(ig); });
     row.appendChild(ig);
     row.appendChild(chip('WhatsApp', 'https://wa.me/?text=' + tq));
     const cp = chip('Copy', null);
     cp.addEventListener('click', () => {
+      trackShare('copy');
       const done = () => { cp.textContent = 'Copied'; setTimeout(() => { cp.textContent = 'Copy'; }, 1600); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => {});
       else { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
@@ -769,6 +798,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     } catch (e) { renderBoard(null, 'The scoreboard is offline. Try again soon.'); }
   }
   function openScores(from) {
+    track('view_scoreboard', { from });
     scoresFrom = from; startEl.hidden = true; overEl.hidden = true; scoresEl.hidden = false; loadBoard();
   }
   function closeScores() {
@@ -784,6 +814,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, score, wave }) });
       if (!r.ok) throw r.status;
       const d = await r.json(); myId = d.id;
+      track('score_submitted', { score, level: wave, rank: d.rank });
       nameForm.hidden = true;
       $('rankLine').textContent = d.rank === 1 ? "You're #1!" : 'You ranked #' + d.rank;
       openScores('over'); renderBoard(d.top);
@@ -801,6 +832,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   treatBtn.addEventListener('click', useTreat);
   muteBtn.addEventListener('click', () => {
     muted = !muted; muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
+    track('sound_toggle', { sound: muted ? 'off' : 'on', in_game: state === 'play' });
     try { localStorage.setItem('tinsel-muted', muted ? '1' : '0'); } catch (e) {}
     initAudio();
     if (musicGain && ac) musicGain.gain.setTargetAtTime(muted ? 0 : .32, ac.currentTime, .05);
@@ -823,6 +855,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       const w = 1 + Math.floor(time / 14);
       if (w !== wave) {
         wave = w; bannerT = 1.6;
+        track('level_up', { level: wave, score, duration_s: Math.round(time) });
         trees.forEach(t => { if (!t.on && wave >= t.unlock) { t.on = true; t.grow = 0; t.hp = ORN_MAX;
           texts.push({ x: t.x, y: t.y - 150 * t.sc, t: 0, s: 'NEW TREE!', c: '#7be0a0', size: 22 }); tone(392, 784, .3, 'triangle', .1); } });
         updateHud();
