@@ -30,6 +30,8 @@ html = html
   .replace(/<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>\s*/g, '')
   .replace(/<link href="https:\/\/fonts\.googleapis\.com\/css2[^>]*>\s*/g, '');
 if (html.includes('fonts.googleapis.com')) throw new Error('Google Fonts link not removed; update scripts/prepare-www.mjs');
+// The web build loads the Google tag from /metrics (Cloudflare gateway); that path does not exist in the app.
+html = html.replace(/<!-- ga4:start -->[\s\S]*?<!-- ga4:end -->\s*/, '');
 const faces = `<style>
 @font-face{font-family:'Lilita One';font-weight:400;font-display:swap;src:url(fonts/lilita-one-latin-400-normal.woff2) format('woff2')}
 @font-face{font-family:'Nunito';font-weight:600;font-display:swap;src:url(fonts/nunito-latin-600-normal.woff2) format('woff2')}

@@ -86,6 +86,15 @@ head = f'''<!doctype html>
 <script type="application/ld+json">{json.dumps(jsonld, ensure_ascii=False)}</script>
 '''
 
+# Google tag, served first-party through Cloudflare Google tag gateway (/metrics). Stripped from the iOS app build.
+GA_ID = 'G-1RNMWSVFGF'
+ga = ('<!-- ga4:start -->\n'
+      f'<script async src="/metrics/?id={GA_ID}"></script>\n'
+      '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}'
+      f"gtag('js',new Date());gtag('config','{GA_ID}',{{transport_url:location.origin+'/metrics',first_party_collection:true}});</script>\n"
+      '<!-- ga4:end -->\n')
+head = head + ga
+
 html = head + head_src + '\n</head>\n<body>\n' + body_src.rstrip() + '\n</body>\n</html>\n'
 open(os.path.join(SITE, 'index.html'), 'w', encoding='utf-8').write(html)
 
