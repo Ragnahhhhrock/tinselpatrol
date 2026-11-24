@@ -86,7 +86,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 #left{display:flex;flex-direction:column;align-items:flex-start}
 .btns{display:flex;gap:6px;margin-top:8px}
 .btns #mute{margin-top:0}
-#pauseBtn{pointer-events:auto;background:rgba(255,255,255,.1);color:var(--muted);border:0;border-radius:999px;padding:6px 12px;font:800 11px var(--body);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+#pauseBtn{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.1);color:var(--muted);border:0;border-radius:999px;padding:5px 11px;font:800 11px var(--body);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 #treat{pointer-events:auto;position:relative;width:68px;height:68px;border-radius:50%;border:0;padding:0;color:var(--ink);
   background:conic-gradient(var(--gold) calc(var(--p,0)*1%),rgba(255,255,255,.18) 0);cursor:pointer}
 #treat .in{position:absolute;inset:5px;border-radius:50%;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
@@ -202,7 +202,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   <div id="hud" hidden>
     <div id="left">
       <div class="stat"><span class="lbl">Score</span><b id="score">0</b></div>
-      <div class="btns"><button id="mute" type="button">Sound on</button><button id="pauseBtn" type="button" aria-label="Pause game">Pause</button></div>
+      <div class="btns"><button id="mute" type="button">Sound on</button><button id="pauseBtn" type="button" aria-label="Paws (pause game)" title="PAWS"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12.4c-2.7 0-5.2 3-5.2 5.2 0 1.6 1.2 2.4 2.7 2.4 1 0 1.7-.4 2.5-.4s1.5.4 2.5.4c1.5 0 2.7-.8 2.7-2.4 0-2.2-2.5-5.2-5.2-5.2z"/><ellipse cx="4.8" cy="11" rx="1.7" ry="2.3" transform="rotate(-20 4.8 11)"/><ellipse cx="9" cy="6.4" rx="1.7" ry="2.4"/><ellipse cx="15" cy="6.4" rx="1.7" ry="2.4"/><ellipse cx="19.2" cy="11" rx="1.7" ry="2.3" transform="rotate(20 19.2 11)"/></svg></button></div>
     </div>
     <div class="stat mid"><span class="lbl">Level</span><b id="wave">1</b></div>
     <button id="treat" type="button" aria-label="Treat: scare every cat and restore an ornament on each tree">
@@ -235,10 +235,10 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     </div>
   </div>
 
-  <div id="pause" class="overlay" hidden role="dialog" aria-label="Game paused">
+  <div id="pause" class="overlay" hidden role="dialog" aria-label="PAWS: game paused">
     <div class="panel">
       <span class="eyebrow">Tinsel Patrol</span>
-      <h2>Paused</h2>
+      <h2>PAWS</h2>
       <button id="resume" class="go" type="button">Resume</button>
       <div class="row"><button id="quit" class="chip" type="button">Quit to home</button></div>
     </div>
