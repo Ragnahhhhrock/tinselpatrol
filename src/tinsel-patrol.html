@@ -41,7 +41,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 @keyframes pulse{to{transform:scale(1.1)}}
 .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:rgba(30,12,16,.5)}
 /* start screen sits high and light so the swipe demo on the floor shows below it */
-#start{align-items:flex-start;padding-top:max(48px,8vh);background:linear-gradient(rgba(30,12,16,.45),rgba(30,12,16,.1) 70%)}
+#start{align-items:flex-start;padding-top:max(24px,4vh);background:linear-gradient(rgba(30,12,16,.45),rgba(30,12,16,.1) 70%)}
 .panel{width:100%;max-width:340px;background:var(--panel);border-radius:22px;padding:26px 22px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.45);text-align:center}
 .panel h1,.panel h2{margin:0;font:400 44px/1 var(--display);color:var(--gold);text-wrap:balance}
 .eyebrow{font:800 12px var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
@@ -83,10 +83,58 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .panel .go.alt{background:rgba(255,255,255,.12);box-shadow:0 5px 0 rgba(0,0,0,.25);font-size:20px;padding:12px}
 #over .panel,#scores .panel{max-height:calc(100% - 8px);overflow-y:auto;gap:12px}
 button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+/* home screen: Pumpkin Smash layout (hero, title, key, play, scores, credit) in Tinsel Patrol tokens */
+#start{overflow-y:auto}
+.panel.home{max-width:380px;gap:10px;padding:22px 22px 18px}
+.home .hero{width:clamp(84px,14dvh,120px);margin:0 auto -2px;animation:bob 3.4s ease-in-out infinite}
+.home .hero svg{display:block;width:100%;height:auto}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-6px) rotate(1.5deg)}}
+.crew{list-style:none;margin:4px 0;padding:0;width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.crew-chip{display:flex;flex-direction:column;align-items:center;gap:2px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.1);border-radius:16px;padding:8px 6px}
+.crew-chip.gold{border-color:var(--gold)}
+.crew-chip svg{width:44px;height:40px}
+.crew-chip svg.fat{width:52px}
+.crew-chip b{font:800 13px/1.1 var(--body);color:var(--ink)}
+.crew-chip small{font:800 11px/1.2 var(--body);letter-spacing:.04em;color:var(--muted)}
+.scores{width:100%;background:rgba(255,255,255,.06);border-radius:16px;padding:10px 12px 8px;text-align:left}
+.scores h3{margin:0 0 6px;font:400 22px/1 var(--display);letter-spacing:.02em;color:var(--gold)}
+.scores .board{max-height:22dvh;overflow-y:auto;gap:4px}
+.scores .board li{background:none;padding:4px 2px}
+@media (max-height:700px){.crew-chip small{display:none}.home .hero{width:72px}}
+@media (prefers-reduced-motion:reduce){.home .hero{animation:none}}
 @media (prefers-reduced-motion:reduce){#treat.ready{animation:none}}
 </style>
 
 <div id="stage">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark" viewBox="0 0 64 64">
+        <rect x="28" y="49" width="7" height="8" rx="1.5" fill="#6b4327"/>
+        <path d="M8 51 L31.5 27 L55 51 Z" fill="#236b43"/>
+        <path d="M13 39 L31.5 18 L50 39 Z" fill="#2f8a55"/>
+        <path d="M18 28 L31.5 12 L45 28 Z" fill="#3a9e63"/>
+        <path d="M31.5 3 l2.9 5.9 6.5 .9-4.7 4.6 1.1 6.4-5.8-3-5.8 3 1.1-6.4-4.7-4.6 6.5-.9z" fill="#f6c453"/>
+        <circle cx="21" cy="45" r="3.4" fill="#e2453c"/><circle cx="26" cy="31" r="2.8" fill="#ff7eb6"/><circle cx="38" cy="23" r="2.4" fill="#4aa3ff"/>
+        <g transform="translate(44 45)">
+          <path d="M-10 -3 L-8.5 -14 L-2 -7.5 Z M10 -3 L8.5 -14 L2 -7.5 Z" fill="#f08a3c"/>
+          <path d="M-7.6 -5.5 L-7.4 -10.6 L-4.2 -7.2 Z M7.6 -5.5 L7.4 -10.6 L4.2 -7.2 Z" fill="#f7a8b8"/>
+          <ellipse rx="11" ry="9.5" fill="#f08a3c"/>
+          <ellipse cx="-4.2" cy="-.8" rx="2.7" ry="3" fill="#ffe066"/><ellipse cx="4.2" cy="-.8" rx="2.7" ry="3" fill="#ffe066"/>
+          <ellipse cx="-4.2" cy="-.8" rx=".95" ry="2.5" fill="#1a1720"/><ellipse cx="4.2" cy="-.8" rx=".95" ry="2.5" fill="#1a1720"/>
+          <path d="M-1.7 3.3 H1.7 L0 5.2 Z" fill="#f27c98"/>
+        </g>
+      </symbol>
+      <symbol id="cathead" viewBox="-14 -16 28 26">
+        <path d="M-12 -2 L-10 -15 L-2 -8 Z M12 -2 L10 -15 L2 -8 Z" fill="var(--fur)"/>
+        <path d="M-9.5 -5 L-9 -11.5 L-5 -7.5 Z M9.5 -5 L9 -11.5 L5 -7.5 Z" fill="#f27c98"/>
+        <ellipse cx="0" cy="0" rx="13" ry="10.5" fill="var(--fur)"/>
+        <path d="M0 -10 V-6 M-4 -9.5 L-3.6 -6.4 M4 -9.5 L3.6 -6.4" stroke="var(--stripe)" stroke-width="1.5" stroke-linecap="round"/>
+        <ellipse cx="-5" cy="-1" rx="3" ry="3.3" fill="#ffe066"/><ellipse cx="5" cy="-1" rx="3" ry="3.3" fill="#ffe066"/>
+        <ellipse cx="-5" cy="-1" rx="1" ry="2.8" fill="#1a1720"/><ellipse cx="5" cy="-1" rx="1" ry="2.8" fill="#1a1720"/>
+        <path d="M-2 3.8 H2 L0 6 Z" fill="#f27c98"/>
+      </symbol>
+    </defs>
+  </svg>
   <canvas id="cv"></canvas>
   <div id="soundHint" hidden>Tap to turn on sound</div>
   <div id="hud" hidden>
@@ -104,12 +152,21 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   </div>
 
   <div id="start" class="overlay">
-    <div class="panel">
+    <div class="panel home">
+      <div class="hero" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><use href="#mark"/></svg>
+      </div>
       <span class="eyebrow">Tinsel Patrol</span>
       <h1 class="shout">DEFEND<br>THE TREE!</h1>
       <p class="order">KEEP CATS OFF THE TREE(S)</p>
+      <ul class="crew">
+        <li class="crew-chip"><svg viewBox="0 0 28 26" aria-hidden="true"><use href="#cathead" style="--fur:#f08a3c;--stripe:#c4661f"/></svg><b>Cat</b><small>Swipe it, +10</small></li>
+        <li class="crew-chip"><svg viewBox="0 0 28 26" aria-hidden="true"><use href="#cathead" style="--fur:#98a1b0;--stripe:#6b7484"/></svg><b>Zoomie</b><small>Fast, +20</small></li>
+        <li class="crew-chip"><svg class="fat" viewBox="0 0 28 26" aria-hidden="true"><use href="#cathead" style="--fur:#2c2836;--stripe:#1a1720"/></svg><b>Fat cat</b><small>Two hits, +25</small></li>
+        <li class="crew-chip gold"><svg viewBox="0 0 28 26" aria-hidden="true"><use href="#cathead" style="--fur:#f4ead8;--stripe:#d99a55"/><circle cx="14" cy="23.4" r="2.6" fill="#f6c453"/></svg><b>Bauble cat</b><small>Fixes a tree, +40</small></li>
+      </ul>
       <button id="play" class="go" type="button">Start</button>
-      <div class="row"><button id="startScores" class="chip" type="button">High scores</button></div>
+      <div class="scores"><h3>High scores</h3><ol id="startBoard" class="board"></ol></div>
       <p class="credit">Another <a href="https://malgordon.com/">Mal Gordon</a> creation</p>
     </div>
   </div>
@@ -731,16 +788,17 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     } catch (e) {}
     btn.textContent = label;
   }
-  function renderBoard(rows, msg) {
-    board.textContent = '';
-    if (!rows || !rows.length) { const li = document.createElement('li'); li.className = 'board-msg'; li.style.display = 'block'; li.style.background = 'none'; li.textContent = msg || 'No scores yet. Be the first!'; board.appendChild(li); return; }
+  function renderBoard(rows, msg, target) {
+    const el = target || board;
+    el.textContent = '';
+    if (!rows || !rows.length) { const li = document.createElement('li'); li.className = 'board-msg'; li.style.display = 'block'; li.style.background = 'none'; li.textContent = msg || 'No scores yet. Be the first!'; el.appendChild(li); return; }
     rows.forEach((r, i) => {
       const li = document.createElement('li'); if (r.id === myId) li.className = 'me';
       const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
       const wv = document.createElement('span'); wv.className = 'wv'; wv.textContent = r.wave ? 'Level ' + r.wave : '';
       const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = r.score;
-      li.append(n, nm, wv, sc); board.appendChild(li);
+      li.append(n, nm, wv, sc); el.appendChild(li);
     });
   }
   async function loadBoard() {
@@ -776,7 +834,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       $('rankLine').textContent = err === 429 ? 'Easy, tiger. Try again in a moment.' : 'Could not save. Try again.';
     }
   });
-  $('startScores').addEventListener('click', () => openScores('start'));
+  async function loadStartBoard() {
+    const el = $('startBoard'); renderBoard(null, 'Loading…', el);
+    try { const r = await fetch(API, { cache: 'no-store' }); if (!r.ok) throw 0; renderBoard((await r.json()).top.slice(0, 5), null, el); }
+    catch (e) { renderBoard(null, 'The scoreboard is offline. Try again soon.', el); }
+  }
+  loadStartBoard();
   $('overScores').addEventListener('click', () => openScores('over'));
   $('scoresClose').addEventListener('click', closeScores);
 
