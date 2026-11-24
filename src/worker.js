@@ -12,10 +12,12 @@ const json = (data, status = 200) =>
 
 let ready;
 function init(db) {
+  // Cache only a successful setup: a one-off D1 failure must not stick for the life of the isolate.
   ready ||= db.batch([
     db.prepare('CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, score INTEGER NOT NULL, created INTEGER NOT NULL, ip TEXT)'),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_scores_score ON scores (score DESC, created ASC)'),
   ]).then(() => db.prepare('ALTER TABLE scores ADD COLUMN wave INTEGER').run().catch(() => {})); // no-op once the column exists
+  ready.catch(() => { ready = undefined; });
   return ready;
 }
 
