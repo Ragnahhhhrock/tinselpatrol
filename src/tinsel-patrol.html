@@ -31,6 +31,9 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--
 .mid{align-items:center}
 #mute{pointer-events:auto;margin-top:8px;background:rgba(255,255,255,.1);color:var(--muted);border:0;border-radius:999px;padding:6px 12px;font:800 11px var(--body);letter-spacing:.08em;text-transform:uppercase;align-self:flex-start}
 #left{display:flex;flex-direction:column;align-items:flex-start}
+.btns{display:flex;gap:6px;margin-top:8px}
+.btns #mute{margin-top:0}
+#pauseBtn{pointer-events:auto;background:rgba(255,255,255,.1);color:var(--muted);border:0;border-radius:999px;padding:6px 12px;font:800 11px var(--body);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 #treat{pointer-events:auto;position:relative;width:68px;height:68px;border-radius:50%;border:0;padding:0;color:var(--ink);
   background:conic-gradient(var(--gold) calc(var(--p,0)*1%),rgba(255,255,255,.18) 0);cursor:pointer}
 #treat .in{position:absolute;inset:5px;border-radius:50%;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
@@ -145,7 +148,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   <div id="hud" hidden>
     <div id="left">
       <div class="stat"><span class="lbl">Score</span><b id="score">0</b></div>
-      <button id="mute" type="button">Sound on</button>
+      <div class="btns"><button id="mute" type="button">Sound on</button><button id="pauseBtn" type="button" aria-label="Pause game">Pause</button></div>
     </div>
     <div class="stat mid"><span class="lbl">Level</span><b id="wave">1</b></div>
     <button id="treat" type="button" aria-label="Treat: scare every cat and restore an ornament on each tree">
@@ -175,6 +178,16 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       <div class="scores"><h3>High scores</h3><ol id="startBoard" class="board"></ol></div>
       <a class="chip gold cocoa" href="https://buy.stripe.com/3cI4gr1PPfcx4gU0UcaAw0c" target="_blank" rel="noopener noreferrer">Buy me a hot cocoa</a>
       <p class="credit">Another <a href="https://malgordon.com/">Mal Gordon</a> creation</p>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay" hidden role="dialog" aria-label="Game paused">
+    <div class="panel">
+      <span class="eyebrow">Tinsel Patrol</span>
+      <h2>Paused</h2>
+      <p>The cats are frozen. For now.</p>
+      <button id="resume" class="go" type="button">Resume</button>
+      <button id="quit" class="go alt" type="button">Quit to home</button>
     </div>
   </div>
 
@@ -212,7 +225,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 (() => {
   const $ = id => document.getElementById(id);
   const stage = $('stage'), cv = $('cv'), ctx = cv.getContext('2d');
-  const hud = $('hud'), startEl = $('start'), overEl = $('over');
+  const hud = $('hud'), startEl = $('start'), overEl = $('over'), pauseEl = $('pause');
   const treatBtn = $('treat'), muteBtn = $('mute'), soundHint = $('soundHint');
 
   // ---------- state ----------
@@ -224,6 +237,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   try { best = +localStorage.getItem('tinsel-best') || 0; } catch (e) {}
   try { swipedTotal = Math.max(0, parseInt(localStorage.getItem('tinsel-swiped'), 10) || 0); } catch (e) {}
   let muted = false;
+  let paused = false;
   // Analytics: GA4 events via the Google tag (served first-party by Cloudflare Google tag gateway).
   // Pushing gtag-style commands to dataLayer works whether or not gtag.js has loaded yet, and is a silent no-op elsewhere.
   window.dataLayer = window.dataLayer || [];
@@ -331,7 +345,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
     if (!ac) return;
     master();
-    if (ac.state !== 'running' && !document.hidden) { try { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    if (ac.state !== 'running' && !document.hidden && !paused) { try { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
     if (!unlocked) {
       unlocked = true;
       try { const s = ac.createBufferSource(); s.buffer = ac.createBuffer(1, 1, 22050); s.connect(ac.destination); s.start(0); } catch (e) {}
@@ -358,7 +372,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     updateSoundHint();
   }
   function updateSoundHint() {
-    const blocked = state === 'play' && !muted && (!ac || ac.state !== 'running');
+    const blocked = state === 'play' && !paused && !muted && (!ac || ac.state !== 'running');
     soundHint.hidden = !blocked;
   }
   // any touch or click (re)unlocks audio: covers the first tap, and sound the OS paused or interrupted
@@ -465,6 +479,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     }
     musicGain = null;
   }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
   // leaving mid-run counts as an abandoned game (sent once per run)
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && state === 'play' && !runLogged) {
@@ -475,7 +490,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   document.addEventListener('visibilitychange', () => {
     if (!ac) return;
     if (document.hidden) { ac.suspend(); [silentEl, streamEl].forEach(el => { if (el) el.pause(); }); }
-    else if (state === 'play') { ac.resume(); [silentEl, streamEl].forEach(el => { if (el) playEl(el).catch(() => {}); }); }
+    else if (state === 'play' && !paused) { ac.resume(); [silentEl, streamEl].forEach(el => { if (el) playEl(el).catch(() => {}); }); }
   });
 
   // lifetime cats-swiped tally on the home screen, counted up on page load
@@ -500,10 +515,35 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   }
   function begin() {
     const source = state === 'over' ? 'play_again' : 'start_screen';
+    paused = false; pauseEl.hidden = true;
     initAudio(); reset(); state = 'play'; musicStart();
     gamesPlayed++;
     track('game_start', { source, game_number: gamesPlayed, best_score: best, sound: muted ? 'off' : 'on' });
     startEl.hidden = true; overEl.hidden = true; scoresEl.hidden = true; hud.hidden = false;
+  }
+  function pauseGame() {
+    if (state !== 'play' || paused) return;
+    paused = true; pDown = false; lastP = null;
+    pauseEl.hidden = false;
+    if (ac) { try { ac.suspend(); } catch (e) {} }
+    [silentEl, streamEl].forEach(el => { if (el) el.pause(); });
+    track('game_pause', { score, level: wave, duration_s: Math.round(time) });
+  }
+  function resumeGame() {
+    if (!paused) return;
+    paused = false; pauseEl.hidden = true; last = performance.now();
+    initAudio();
+    if (ac) { try { ac.resume(); } catch (e) {} }
+    [silentEl, streamEl].forEach(el => { if (el) playEl(el).catch(() => {}); });
+  }
+  function quitToHome() {
+    if (!paused) return;
+    track('game_quit', { score, level: wave, duration_s: Math.round(time), game_number: gamesPlayed });
+    runLogged = true; paused = false; pauseEl.hidden = true;
+    musicStop(true); state = 'menu'; reset(); loadStartBoard();
+    hud.hidden = true; overEl.hidden = true; scoresEl.hidden = true; startEl.hidden = false;
+    if (ac) { try { ac.resume(); } catch (e) {} }
+    [silentEl, streamEl].forEach(el => { if (el) playEl(el).catch(() => {}); });
   }
   function endGame() {
     state = 'over'; musicStop();
@@ -872,6 +912,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   $('play').addEventListener('click', begin);
   $('again').addEventListener('click', begin);
   treatBtn.addEventListener('click', useTreat);
+  $('pauseBtn').addEventListener('click', pauseGame);
+  $('resume').addEventListener('click', resumeGame);
+  $('quit').addEventListener('click', quitToHome);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { if (paused) resumeGame(); else pauseGame(); }
+  });
   muteBtn.addEventListener('click', () => {
     muted = !muted; muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
     track('sound_toggle', { sound: muted ? 'off' : 'on', in_game: state === 'play' });
@@ -1227,7 +1273,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000); last = now;
-    update(dt); draw();
+    if (!paused) update(dt);
+    draw();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
