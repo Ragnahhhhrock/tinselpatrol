@@ -461,14 +461,36 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       mStep++; mNext += e;
     }
   }
+  // Soundtrack: two tracks play one after the other, looping 1 -> 2 -> 1 -> 2 ... until the game ends.
+  const TRACKS = ['audio/music1.mp3', 'audio/music2.mp3'];
+  let trackBufs = null, trackLoad = null, trackSrc = null, trackRun = 0;
+  function loadTracks() {
+    if (trackLoad) return trackLoad;
+    trackLoad = Promise.all(TRACKS.map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.arrayBuffer(); })
+      .then(b => new Promise((res, rej) => ac.decodeAudioData(b, res, rej)))))
+      .then(b => (trackBufs = b)).catch(() => { trackLoad = null; return null; });
+    return trackLoad;
+  }
+  function playTrack(i, run, gain) {
+    if (run !== trackRun || !ac || !trackBufs) return;
+    const s = ac.createBufferSource(); s.buffer = trackBufs[i]; s.connect(gain);
+    s.onended = () => { if (trackSrc === s) playTrack((i + 1) % trackBufs.length, run, gain); };
+    trackSrc = s; s.start(0);
+  }
   function musicStart() {
     if (!ac) return;
     musicStop(true);
-    musicGain = ac.createGain(); musicGain.gain.value = muted ? 0 : .32; musicGain.connect(master());
-    mStep = 0; mNext = ac.currentTime + .15;
-    musicTimer = setInterval(musicTick, 60); musicTick();
+    musicGain = ac.createGain(); musicGain.gain.value = muted ? 0 : .6; musicGain.connect(master());
+    const run = ++trackRun, gain = musicGain;
+    loadTracks().then(b => {
+      if (run !== trackRun) return;
+      if (b) playTrack(0, run, gain);
+      else { mStep = 0; mNext = ac.currentTime + .15; musicTimer = setInterval(musicTick, 60); musicTick(); }  // fallback: built-in jingle
+    });
   }
   function musicStop(now) {
+    trackRun++;
+    if (trackSrc) { try { trackSrc.onended = null; trackSrc.stop(ac.currentTime + (now ? .05 : .8)); } catch (e) {} trackSrc = null; }
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
     if (musicGain && ac) {
       const g = musicGain, t = ac.currentTime;
@@ -922,7 +944,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     track('sound_toggle', { sound: muted ? 'off' : 'on', in_game: state === 'play' });
     try { localStorage.setItem('tinsel-muted', muted ? '1' : '0'); } catch (e) {}
     initAudio();
-    if (musicGain && ac) musicGain.gain.setTargetAtTime(muted ? 0 : .32, ac.currentTime, .05);
+    if (musicGain && ac) musicGain.gain.setTargetAtTime(muted ? 0 : .6, ac.currentTime, .05);
   });
 
   // ---------- update ----------

@@ -41,6 +41,7 @@ const faces = `<style>
 html = html.replace('</head>', faces + '</head>');
 if (html.length === before) throw new Error('Nothing changed; check public/index.html');
 writeFileSync(join(www, 'index.html'), html);
+cpSync(join(root, 'public', 'audio'), join(www, 'audio'), { recursive: true });
 
 for (const f of ['favicon.svg', 'favicon.ico', 'favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
   cpSync(join(root, 'public', f), join(www, f));
