@@ -94,7 +94,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       <div class="stat"><span class="lbl">Score</span><b id="score">0</b></div>
       <button id="mute" type="button">Sound on</button>
     </div>
-    <div class="stat mid"><span class="lbl">Wave</span><b id="wave">1</b></div>
+    <div class="stat mid"><span class="lbl">Level</span><b id="wave">1</b></div>
     <button id="treat" type="button" aria-label="Treat: scare every cat and restore an ornament on each tree">
       <span class="in">
         <svg viewBox="0 0 28 18" aria-hidden="true"><ellipse cx="11" cy="9" rx="10" ry="6.5" fill="currentColor"/><path d="M19 9 L27 2 V16 Z" fill="currentColor"/><circle cx="6" cy="7.5" r="1.3" fill="#3a1f24"/></svg>
@@ -155,7 +155,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   const WW = 360;               // logical world width
   let H = 640, S = 1, DPR = 1;
   let state = 'menu';           // menu | play | over
-  let time = 0, spawnT = 1.2, wave = 1, score = 0, charge = 0, shake = 0, flash = 0, bannerT = 0, lastLeft = false;
+  let time = 0, spawnT = 1.2, wave = 1, score = 0, charge = 0, shake = 0, flash = 0, bannerT = 0, bannerUp = false, lastLeft = false;
   let best = 0;
   try { best = +localStorage.getItem('tinsel-best') || 0; } catch (e) {}
   let muted = false;
@@ -417,7 +417,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   function reset() {
     cats.length = parts.length = texts.length = ripples.length = trail.length = flyers.length = 0;
     trees.forEach(t => { t.hp = ORN_MAX; t.alive = true; t.shake = 0; t.fallT = 0; t.on = t.unlock <= 1; t.grow = t.on ? 1 : 0; });
-    time = 0; spawnT = 1.2; wave = 1; score = 0; charge = 0; shake = 0; flash = 0; bannerT = 1.6;
+    time = 0; spawnT = 1.2; wave = 1; score = 0; charge = 0; shake = 0; flash = 0; bannerT = 2.2; bannerUp = false;
     shooed = 0; treatsUsed = 0; treesLost = 0; runLogged = false;
     updateHud();
   }
@@ -738,7 +738,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       const li = document.createElement('li'); if (r.id === myId) li.className = 'me';
       const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
       const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
-      const wv = document.createElement('span'); wv.className = 'wv'; wv.textContent = r.wave ? 'Wave ' + r.wave : '';
+      const wv = document.createElement('span'); wv.className = 'wv'; wv.textContent = r.wave ? 'Level ' + r.wave : '';
       const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = r.score;
       li.append(n, nm, wv, sc); board.appendChild(li);
     });
@@ -807,7 +807,8 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     if (state === 'play') {
       const w = 1 + Math.floor(time / 14);
       if (w !== wave) {
-        wave = w; bannerT = 1.6;
+        wave = w; bannerT = 2.2; bannerUp = true; flash = Math.max(flash, .12);
+        tone(523, 659, .12, 'triangle', .1); tone(659, 784, .12, 'triangle', .1, .12); tone(784, 1047, .25, 'triangle', .1, .24);
         track('level_up', { level: wave, score, duration_s: Math.round(time) });
         trees.forEach(t => { if (!t.on && wave >= t.unlock) { t.on = true; t.grow = 0; t.hp = ORN_MAX;
           texts.push({ x: t.x, y: t.y - 150 * t.sc, t: 0, s: 'NEW TREE!', c: '#7be0a0', size: 22 }); tone(392, 784, .3, 'triangle', .1); } });
@@ -1116,11 +1117,18 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     });
     ctx.globalAlpha = 1;
     if (bannerT > 0 && state === 'play') {
-      ctx.globalAlpha = Math.min(1, bannerT * 1.5);
-      ctx.font = '400 46px "Lilita One", "Trebuchet MS", sans-serif';
-      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(30,12,16,.8)';
-      const s = 'Wave ' + wave; ctx.strokeText(s, WW / 2, H * .3); ctx.fillStyle = '#f6c453'; ctx.fillText(s, WW / 2, H * .3);
-      ctx.globalAlpha = 1;
+      // level banner: pops in, holds, then fades; "LEVEL UP!" shows when the player has advanced
+      const age = 2.2 - bannerT, pop = age < .25 ? 1 + .35 * (1 - age / .25) : 1;
+      ctx.save(); ctx.globalAlpha = Math.min(1, bannerT * 2);
+      ctx.translate(WW / 2, H * .3); ctx.scale(pop, pop);
+      ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(30,12,16,.85)'; ctx.lineJoin = 'round';
+      if (bannerUp) {
+        ctx.font = '400 26px "Lilita One", "Trebuchet MS", sans-serif';
+        ctx.strokeText('LEVEL UP!', 0, -34); ctx.fillStyle = '#7be0a0'; ctx.fillText('LEVEL UP!', 0, -34);
+      }
+      ctx.font = '400 56px "Lilita One", "Trebuchet MS", sans-serif';
+      const s = 'Level ' + wave; ctx.strokeText(s, 0, bannerUp ? 8 : 0); ctx.fillStyle = '#f6c453'; ctx.fillText(s, 0, bannerUp ? 8 : 0);
+      ctx.restore();
     }
     if (flash > 0) { ctx.fillStyle = 'rgba(246,196,83,' + flash * 1.2 + ')'; ctx.fillRect(0, 0, WW, H); }
     ctx.restore();
