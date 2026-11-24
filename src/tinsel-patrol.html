@@ -101,8 +101,12 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
 .scores h3{margin:0 0 6px;font:400 22px/1 var(--display);letter-spacing:.02em;color:var(--gold)}
 .scores .board{max-height:22dvh;overflow-y:auto;gap:4px}
 .scores .board li{background:none;padding:4px 2px}
+.tally{margin:2px 0;padding:8px 12px 6px;width:100%;background:rgba(246,196,83,.12);border:2px solid var(--gold);border-radius:16px;animation:tallyIn .7s cubic-bezier(.2,1.4,.4,1) both}
+.tally b{display:block;font:400 clamp(44px,13vw,60px)/1 var(--display);color:var(--gold);font-variant-numeric:tabular-nums;text-shadow:0 4px 0 rgba(0,0,0,.3)}
+.tally span{display:block;margin-top:2px;font:800 12px var(--body);letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+@keyframes tallyIn{from{opacity:0;transform:scale(.7) translateY(10px)}to{opacity:1;transform:none}}
 @media (max-height:700px){.crew-chip small{display:none}.home .hero{width:72px}}
-@media (prefers-reduced-motion:reduce){.home .hero{animation:none}}
+@media (prefers-reduced-motion:reduce){.home .hero{animation:none}.tally{animation:none}}
 @media (prefers-reduced-motion:reduce){#treat.ready{animation:none}}
 </style>
 
@@ -160,6 +164,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
       <span class="eyebrow">Tinsel Patrol</span>
       <h1 class="shout">DEFEND<br>THE TREE!</h1>
       <p class="order">KEEP CATS OFF THE TREE(S)</p>
+      <div class="tally" role="status"><b id="swipedTotal">0</b><span>Cats swiped, all games</span></div>
       <ul class="crew">
         <li class="crew-chip"><svg viewBox="0 0 28 26" aria-hidden="true"><use href="#cathead" style="--fur:#f08a3c;--stripe:#c4661f"/></svg><b>Cat</b><small>Swipe it, +10</small></li>
         <li class="crew-chip"><svg viewBox="0 0 28 26" aria-hidden="true"><use href="#cathead" style="--fur:#98a1b0;--stripe:#6b7484"/></svg><b>Zoomie</b><small>Fast, +20</small></li>
@@ -215,8 +220,9 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
   let H = 640, S = 1, DPR = 1;
   let state = 'menu';           // menu | play | over
   let time = 0, spawnT = 1.2, wave = 1, score = 0, charge = 0, shake = 0, flash = 0, bannerT = 0, bannerUp = false, lastLeft = false;
-  let best = 0;
+  let best = 0, swipedTotal = 0;
   try { best = +localStorage.getItem('tinsel-best') || 0; } catch (e) {}
+  try { swipedTotal = Math.max(0, parseInt(localStorage.getItem('tinsel-swiped'), 10) || 0); } catch (e) {}
   let muted = false;
   // Analytics: GA4 events via the Google tag (served first-party by Cloudflare Google tag gateway).
   // Pushing gtag-style commands to dataLayer works whether or not gtag.js has loaded yet, and is a silent no-op elsewhere.
@@ -472,6 +478,18 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     else if (state === 'play') { ac.resume(); [silentEl, streamEl].forEach(el => { if (el) playEl(el).catch(() => {}); }); }
   });
 
+  // lifetime cats-swiped tally on the home screen, counted up on page load
+  (function () {
+    const el = $('swipedTotal'), n = swipedTotal, fmt = v => Math.round(v).toLocaleString('en-AU');
+    if (!n || matchMedia('(prefers-reduced-motion:reduce)').matches) { el.textContent = fmt(n); return; }
+    const dur = Math.min(2200, 900 + n * 4), t0 = performance.now();
+    (function step(now) {
+      const k = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(n * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+    })(t0);
+  })();
+
   // ---------- game flow ----------
   function reset() {
     cats.length = parts.length = texts.length = ripples.length = trail.length = flyers.length = 0;
@@ -565,7 +583,7 @@ button:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid v
     if (c.type === 'bauble') releaseBauble(c);
     if (!quiet) {
       const pts = c.type === 'bauble' ? 40 : c.type === 'fat' ? 25 : c.type === 'zoom' ? 20 : 10;
-      score += pts; shooed++; charge = Math.min(CHARGE_MAX, charge + 1);
+      score += pts; shooed++; swipedTotal++; try { localStorage.setItem('tinsel-swiped', String(swipedTotal)); } catch (e) {} charge = Math.min(CHARGE_MAX, charge + 1);
       texts.push({ x: c.x, y: c.y - 26, t: 0, s: pick(['BOOP!', 'SHOO!', 'MRRP!', 'BEGONE!']), c: '#fff6e5', size: 18 });
       texts.push({ x: c.x, y: c.y - 6, t: 0, s: '+' + pts, c: '#f6c453', size: 15 });
       tone(420, 880, .13, 'triangle', .1);
